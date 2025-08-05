@@ -11,6 +11,17 @@ def main(page: ft.Page):
     username = ft.TextField(label="Usuario")
     password = ft.TextField(label="Contraseña", password=True, can_reveal_password=True)
     resultado = ft.Text()
+    terminos = ft.Checkbox(label="Acepto términos y condiciones")
+
+    def mostrar_bienvenida(nombre):
+        page.controls.clear()
+        page.add(
+            ft.Column([
+                ft.Text(f"Bienvenido, {nombre}!", size=24, weight="bold"),
+                ft.Text("Has iniciado sesión correctamente."),
+            ])
+        )
+        page.update()
 
     def login(e):
         r = requests.post(API_URL + "login/", json={
@@ -18,12 +29,16 @@ def main(page: ft.Page):
             "password": password.value
         })
         if r.status_code == 200:
-            resultado.value = f"Login OK. Token: {r.json()['access']}"
+            mostrar_bienvenida(username.value)
         else:
             resultado.value = f"Error: {r.json().get('detail', r.text)}"
-        page.update()
+            page.update()
 
     def register(e):
+        if not terminos.value:
+            resultado.value = "Debes aceptar los términos y condiciones."
+            page.update()
+            return
         r = requests.post(API_URL + "register/", json={
             "username": username.value,
             "password": password.value
@@ -38,6 +53,7 @@ def main(page: ft.Page):
         ft.Column([
             username,
             password,
+            terminos,
             ft.Row([
                 ft.ElevatedButton("Login", on_click=login),
                 ft.ElevatedButton("Registrar", on_click=register),
