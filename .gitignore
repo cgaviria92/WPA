@@ -1,0 +1,26 @@
+# Entorno virtual
+venv/
+
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+
+# Configuración de VSCode / IDEs
+.vscode/
+.idea/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos temporales
+*.log
+*.bak
+
+# Archivos de Django
+*.sqlite3
+db.sqlite3
+
+# Entorno Flet
+frontend/__pycache__/
