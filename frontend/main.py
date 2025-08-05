@@ -1,8 +1,7 @@
-
 import flet as ft
 import requests
 
-API_URL = "http://127.0.0.1:8000/api/"
+API_URL = "http://127.0.0.1:8000/api/"  # Asegúrate de que tu API DRF esté corriendo
 
 def main(page: ft.Page):
     page.title = "Flet + DRF Auth"
@@ -24,14 +23,18 @@ def main(page: ft.Page):
         page.update()
 
     def login(e):
-        r = requests.post(API_URL + "login/", json={
-            "username": username.value,
-            "password": password.value
-        })
-        if r.status_code == 200:
-            mostrar_bienvenida(username.value)
-        else:
-            resultado.value = f"Error: {r.json().get('detail', r.text)}"
+        try:
+            r = requests.post(API_URL + "login/", json={
+                "username": username.value,
+                "password": password.value
+            })
+            if r.status_code == 200:
+                mostrar_bienvenida(username.value)
+            else:
+                resultado.value = f"Error: {r.json().get('detail', r.text)}"
+                page.update()
+        except Exception as err:
+            resultado.value = f"Error de conexión: {err}"
             page.update()
 
     def register(e):
@@ -39,15 +42,19 @@ def main(page: ft.Page):
             resultado.value = "Debes aceptar los términos y condiciones."
             page.update()
             return
-        r = requests.post(API_URL + "register/", json={
-            "username": username.value,
-            "password": password.value
-        })
-        if r.status_code == 201:
-            resultado.value = "Usuario registrado correctamente"
-        else:
-            resultado.value = f"Error: {r.json().get('error', r.text)}"
-        page.update()
+        try:
+            r = requests.post(API_URL + "register/", json={
+                "username": username.value,
+                "password": password.value
+            })
+            if r.status_code == 201:
+                resultado.value = "Usuario registrado correctamente"
+            else:
+                resultado.value = f"Error: {r.json().get('error', r.text)}"
+            page.update()
+        except Exception as err:
+            resultado.value = f"Error de conexión: {err}"
+            page.update()
 
     page.add(
         ft.Column([
@@ -62,4 +69,5 @@ def main(page: ft.Page):
         ])
     )
 
-ft.app(target=main)
+# 👇 Esto abre siempre en el navegador
+ft.app(target=main, view=ft.AppView.WEB_BROWSER)
