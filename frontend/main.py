@@ -14,12 +14,29 @@ def main(page: ft.Page):
     def mostrar_bienvenida(nombre, experiencia, coint):
         page.controls.clear()
         page.add(
-            ft.Column([
-                ft.Text(f"Bienvenido, {nombre}!", size=24, weight="bold"),
-                ft.Text(f"Monedas: {coint}"),
-                ft.Text(f"Experiencia: {experiencia}"),
-                ft.Text("Has iniciado sesión correctamente."),
-            ])
+            ft.Container(
+                content=ft.Card(
+                    content=ft.Column([
+                        ft.Row([
+                            ft.Icon(ft.icons.PERSON, size=40),
+                            ft.Text(f"Bienvenido, {nombre}!", size=28, weight="bold"),
+                        ], alignment="center"),
+                        ft.Divider(),
+                        ft.Row([
+                            ft.Icon(ft.icons.MONETIZATION_ON, color="gold", size=30),
+                            ft.Text(f"Monedas: {coint}", size=22),
+                        ], alignment="center"),
+                        ft.Row([
+                            ft.Icon(ft.icons.STAR, color="orange", size=30),
+                            ft.Text(f"Experiencia: {experiencia}", size=22),
+                        ], alignment="center"),
+                        ft.Divider(),
+                        ft.Text("¡Has iniciado sesión correctamente!", size=18, italic=True, color="green"),
+                    ], spacing=20, alignment="center"),
+                ),
+                padding=30,
+                alignment=ft.alignment.center,
+            )
         )
         page.update()
 
