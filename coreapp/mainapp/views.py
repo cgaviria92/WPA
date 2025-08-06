@@ -66,10 +66,16 @@ def edit_form(request, form_id):
     fields = dynamic_form.fields.all().order_by('order')
     field_types = FieldType.objects.all()
     
+    # Si no hay tipos de campo, mostrar mensaje de error
+    if not field_types.exists():
+        messages.error(request, 
+            'No hay tipos de campo disponibles. Contacta al administrador para configurar el sistema.')
+    
     context = {
         'dynamic_form': dynamic_form,
         'fields': fields,
         'field_types': field_types,
+        'has_field_types': field_types.exists(),
     }
     return render(request, 'mainapp/edit_form.html', context)
 

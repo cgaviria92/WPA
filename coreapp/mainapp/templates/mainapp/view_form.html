@@ -1,0 +1,106 @@
+{% extends 'mainapp/base.html' %}
+
+{% block title %}{{ dynamic_form.title }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-list-alt"></i> {{ dynamic_form.title }}</h4>
+                {% if dynamic_form.description %}
+                    <p class="mb-0 text-muted">{{ dynamic_form.description }}</p>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if fields %}
+                    <form method="post">
+                        {% csrf_token %}
+                        {% for field in fields %}
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    {{ field.label }}
+                                    {% if field.is_required %}
+                                        <span class="text-danger">*</span>
+                                    {% endif %}
+                                </label>
+                                
+                                {% if field.field_type.name == 'text' %}
+                                    <input type="text" class="form-control" name="field_{{ field.id }}" 
+                                           {% if field.is_required %}required{% endif %}
+                                           {% if field.max_length %}maxlength="{{ field.max_length }}"{% endif %}>
+                                
+                                {% elif field.field_type.name == 'textarea' %}
+                                    <textarea class="form-control" name="field_{{ field.id }}" rows="4"
+                                              {% if field.is_required %}required{% endif %}
+                                              {% if field.max_length %}maxlength="{{ field.max_length }}"{% endif %}></textarea>
+                                
+                                {% elif field.field_type.name == 'number' %}
+                                    <input type="number" class="form-control" name="field_{{ field.id }}"
+                                           {% if field.is_required %}required{% endif %}
+                                           {% if field.min_value %}min="{{ field.min_value }}"{% endif %}
+                                           {% if field.max_value %}max="{{ field.max_value }}"{% endif %}>
+                                
+                                {% elif field.field_type.name == 'email' %}
+                                    <input type="email" class="form-control" name="field_{{ field.id }}"
+                                           {% if field.is_required %}required{% endif %}>
+                                
+                                {% elif field.field_type.name == 'date' %}
+                                    <input type="date" class="form-control" name="field_{{ field.id }}"
+                                           {% if field.is_required %}required{% endif %}>
+                                
+                                {% elif field.field_type.name == 'file' %}
+                                    <input type="file" class="form-control" name="field_{{ field.id }}"
+                                           {% if field.is_required %}required{% endif %}>
+                                
+                                {% elif field.field_type.name == 'boolean' %}
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" name="field_{{ field.id }}" value="true">
+                                        <label class="form-check-label">Sí</label>
+                                    </div>
+                                
+                                {% elif field.field_type.name == 'choice' %}
+                                    <select class="form-control" name="field_{{ field.id }}" {% if field.is_required %}required{% endif %}>
+                                        <option value="">Seleccionar...</option>
+                                        {% for choice in field.get_choices_list %}
+                                            <option value="{{ choice }}">{{ choice }}</option>
+                                        {% endfor %}
+                                    </select>
+                                {% endif %}
+                                
+                                {% if field.help_text %}
+                                    <div class="form-text">{{ field.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'index' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Volver
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i> Enviar Formulario
+                            </button>
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-exclamation-circle fa-3x text-muted mb-3"></i>
+                        <h6>Este formulario no tiene campos configurados</h6>
+                        <p class="text-muted">Contacta al creador del formulario.</p>
+                        <a href="{% url 'index' %}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left"></i> Volver al Inicio
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="card-footer text-muted">
+                <small>
+                    <i class="fas fa-user"></i> Creado por: {{ dynamic_form.creator.username }} | 
+                    <i class="fas fa-calendar"></i> {{ dynamic_form.created_at|date:"d/m/Y H:i" }}
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

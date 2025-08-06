@@ -85,54 +85,71 @@
                 <h5><i class="fas fa-plus"></i> Agregar Campo</h5>
             </div>
             <div class="card-body">
-                <form id="add-field-form">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label">Tipo de Campo</label>
-                        <select class="form-control" id="field_type_id" name="field_type_id" required>
-                            <option value="">Seleccionar tipo...</option>
-                            {% for field_type in field_types %}
-                                <option value="{{ field_type.id }}" data-cost="{{ field_type.cost }}">
-                                    {{ field_type.display_name }} ({{ field_type.cost }} monedas)
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Etiqueta del Campo</label>
-                        <input type="text" class="form-control" id="label" name="label" placeholder="Ej: Nombre completo" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Texto de Ayuda</label>
-                        <input type="text" class="form-control" id="help_text" name="help_text" placeholder="Opcional">
-                    </div>
-
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="is_required" name="is_required">
-                            <label class="form-check-label" for="is_required">
-                                Campo obligatorio
-                            </label>
+                {% if has_field_types %}
+                    <form id="add-field-form">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">Tipo de Campo</label>
+                            <select class="form-control" id="field_type_id" name="field_type_id" required>
+                                <option value="">Seleccionar tipo...</option>
+                                {% for field_type in field_types %}
+                                    <option value="{{ field_type.id }}" data-cost="{{ field_type.cost }}">
+                                        {{ field_type.display_name }} ({{ field_type.cost }} monedas)
+                                    </option>
+                                {% endfor %}
+                            </select>
                         </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Etiqueta del Campo</label>
+                            <input type="text" class="form-control" id="label" name="label" placeholder="Ej: Nombre completo" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Texto de Ayuda</label>
+                            <input type="text" class="form-control" id="help_text" name="help_text" placeholder="Opcional">
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_required" name="is_required">
+                                <label class="form-check-label" for="is_required">
+                                    Campo obligatorio
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3" id="choices-section" style="display: none;">
+                            <label class="form-label">Opciones (una por línea)</label>
+                            <textarea class="form-control" id="choices" name="choices" rows="4" placeholder="Opción 1&#10;Opción 2&#10;Opción 3"></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100" id="add-field-btn">
+                            <i class="fas fa-plus"></i> Agregar Campo
+                        </button>
+                    </form>
+
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <h6><i class="fas fa-info-circle"></i> Información</h6>
+                        <p class="small mb-1">Monedas disponibles: <strong>{{ user.monedas }}</strong></p>
+                        <p class="small mb-0">Costo del campo: <strong id="field-cost">0</strong> monedas</p>
                     </div>
-
-                    <div class="mb-3" id="choices-section" style="display: none;">
-                        <label class="form-label">Opciones (una por línea)</label>
-                        <textarea class="form-control" id="choices" name="choices" rows="4" placeholder="Opción 1&#10;Opción 2&#10;Opción 3"></textarea>
+                {% else %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>No hay tipos de campo configurados</strong><br>
+                        Contacta al administrador para configurar los tipos de campo del sistema.
                     </div>
-
-                    <button type="submit" class="btn btn-primary w-100" id="add-field-btn">
-                        <i class="fas fa-plus"></i> Agregar Campo
-                    </button>
-                </form>
-
-                <div class="mt-3 p-3 bg-light rounded">
-                    <h6><i class="fas fa-info-circle"></i> Información</h6>
-                    <p class="small mb-1">Monedas disponibles: <strong>{{ user.monedas }}</strong></p>
-                    <p class="small mb-0">Costo del campo: <strong id="field-cost">0</strong> monedas</p>
-                </div>
+                    
+                    {% if user.is_admin_user %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Eres administrador</strong><br>
+                            Ejecuta este comando en la terminal:<br>
+                            <code>python manage.py setup_initial_data</code>
+                        </div>
+                    {% endif %}
+                {% endif %}
             </div>
         </div>
     </div>
@@ -142,6 +159,11 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Solo ejecutar si hay tipos de campo disponibles
+    if (!document.getElementById('field_type_id')) {
+        return;
+    }
+    
     const fieldTypeSelect = document.getElementById('field_type_id');
     const choicesSection = document.getElementById('choices-section');
     const fieldCostDisplay = document.getElementById('field-cost');

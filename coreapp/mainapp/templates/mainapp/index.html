@@ -1,29 +1,175 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Mi App</title>
+{% extends 'mainapp/base.html' %}
 
-  <!-- BOOTSTRAP CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light text-center p-5">
+{% block title %}Inicio - {{ block.super }}{% endblock %}
 
-  <div class="container">
-    <h1 class="display-4 mb-4">Bienvenido a mi app Django</h1>
-    <p class="lead">Con frontend y backend integrados, usando Bootstrap</p>
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="jumbotron bg-primary text-white rounded p-5 mb-4">
+            <h1 class="display-4">¡Bienvenido a FormBuilder Pro!</h1>
+            <p class="lead">Plataforma dinámica y ajustable a lo que necesitas. Crea formularios sin código, gestiona tus recursos con un sistema de monedas inteligente.</p>
+            {% if not user.is_authenticated %}
+                <div class="mt-4">
+                    <a class="btn btn-warning btn-lg me-3" href="{% url 'register' %}">
+                        <i class="fas fa-user-plus"></i> ¡Regístrate Gratis!
+                    </a>
+                    <a class="btn btn-outline-light btn-lg" href="{% url 'login' %}">
+                        <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+                    </a>
+                </div>
+                <div class="mt-3">
+                    <small class="text-light"><i class="fas fa-crown"></i> ¡El primer usuario se convierte en administrador con 1000 monedas!</small>
+                </div>
+            {% else %}
+                <a class="btn btn-warning btn-lg" href="{% url 'dashboard' %}">
+                    <i class="fas fa-tachometer-alt"></i> Ir al Dashboard
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
 
-    <button class="btn btn-primary btn-lg mt-4" onclick="accion()">Haz clic</button>
-  </div>
+<div class="row mb-5">
+    <div class="col-12 text-center">
+        <h2 class="mb-4">🚀 Plataforma Dinámica sin Límites</h2>
+        <p class="lead text-muted">Ajústable a lo que necesitas, cuando lo necesitas</p>
+    </div>
+</div>
 
-  <!-- BOOTSTRAP JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-magic fa-3x text-primary"></i>
+                </div>
+                <h5 class="card-title">Sin Código, Todo Posible</h5>
+                <p class="card-text">Crea formularios complejos con campos dinámicos sin escribir una sola línea de código. Arrastra, suelta y configura.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-coins fa-3x text-warning"></i>
+                </div>
+                <h5 class="card-title">Sistema de Economía Digital</h5>
+                <p class="card-text">Cada campo tiene un valor. Gestiona tus recursos inteligentemente. Texto cuesta menos que archivos, números menos que texto largo.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body text-center p-4">
+                <div class="mb-3">
+                    <i class="fas fa-users-cog fa-3x text-success"></i>
+                </div>
+                <h5 class="card-title">Tu Sistema, Tus Reglas</h5>
+                <p class="card-text">El primer usuario se convierte en administrador. Controla costos, gestiona usuarios y define las reglas del juego.</p>
+            </div>
+        </div>
+    </div>
+</div>
 
-  <script>
-    function accion() {
-      alert("¡Funciona bonito y responsive!");
-    }
-  </script>
+<div class="row">
+    <div class="col-12">
+        <h3><i class="fas fa-list"></i> Formularios Públicos Disponibles</h3>
+        {% if forms %}
+            <div class="row">
+                {% for form in forms %}
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card form-card h-100 shadow-sm">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ form.title }}</h5>
+                                <p class="card-text">{{ form.description|truncatewords:20 }}</p>
+                                <p class="card-text">
+                                    <small class="text-muted">
+                                        <i class="fas fa-user"></i> {{ form.creator.username }}<br>
+                                        <i class="fas fa-calendar"></i> {{ form.created_at|date:"d/m/Y" }}
+                                    </small>
+                                </p>
+                            </div>
+                            <div class="card-footer bg-transparent">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <a href="{% url 'view_form' form.id %}" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-eye"></i> Ver Formulario
+                                    </a>
+                                    <span class="badge bg-success field-cost">
+                                        <i class="fas fa-coins"></i> {{ form.total_cost }} monedas
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="card bg-light border-0">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-plus-circle fa-3x text-muted mb-3"></i>
+                    <h5>No hay formularios públicos disponibles aún</h5>
+                    <p class="text-muted">
+                        {% if user.is_authenticated %}
+                            ¡Sé el primero en crear un formulario increíble!
+                        {% else %}
+                            ¡Regístrate para crear el primer formulario de la plataforma!
+                        {% endif %}
+                    </p>
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'create_form' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Crear Primer Formulario
+                        </a>
+                    {% else %}
+                        <a href="{% url 'register' %}" class="btn btn-warning">
+                            <i class="fas fa-user-plus"></i> ¡Empezar Ahora!
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
 
-</body>
-</html>
+<div class="row mt-5 pt-4 border-top">
+    <div class="col-12 text-center">
+        <h4 class="mb-4">💡 ¿Cómo Funciona?</h4>
+    </div>
+    <div class="col-md-3">
+        <div class="text-center mb-4">
+            <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                <span class="h4 mb-0">1</span>
+            </div>
+            <h6 class="mt-3">Regístrate</h6>
+            <p class="small text-muted">Crea tu cuenta y obtén monedas iniciales</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-center mb-4">
+            <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                <span class="h4 mb-0">2</span>
+            </div>
+            <h6 class="mt-3">Diseña</h6>
+            <p class="small text-muted">Crea formularios agregando campos dinámicamente</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-center mb-4">
+            <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                <span class="h4 mb-0">3</span>
+            </div>
+            <h6 class="mt-3">Gestiona</h6>
+            <p class="small text-muted">Administra costos y recursos inteligentemente</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="text-center mb-4">
+            <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                <span class="h4 mb-0">4</span>
+            </div>
+            <h6 class="mt-3">Recolecta</h6>
+            <p class="small text-muted">Recibe y analiza datos de tus formularios</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
