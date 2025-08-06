@@ -1,0 +1,96 @@
+{% extends 'mainapp/base.html' %}
+
+{% block title %}Inicio - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="jumbotron bg-primary text-white rounded p-5 mb-4">
+            <h1 class="display-4">¡Bienvenido a FormBuilder Pro!</h1>
+            <p class="lead">Crea formularios dinámicos sin código. El primer usuario registrado se convierte en administrador.</p>
+            {% if not user.is_authenticated %}
+                <a class="btn btn-warning btn-lg" href="{% url 'register' %}">
+                    <i class="fas fa-user-plus"></i> ¡Regístrate Ahora!
+                </a>
+            {% else %}
+                <a class="btn btn-warning btn-lg" href="{% url 'dashboard' %}">
+                    <i class="fas fa-tachometer-alt"></i> Ir al Dashboard
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <h2><i class="fas fa-list"></i> Formularios Públicos Disponibles</h2>
+        {% if forms %}
+            <div class="row">
+                {% for form in forms %}
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card form-card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ form.title }}</h5>
+                                <p class="card-text">{{ form.description|truncatewords:20 }}</p>
+                                <p class="card-text">
+                                    <small class="text-muted">
+                                        Creado por: {{ form.creator.username }}<br>
+                                        <i class="fas fa-calendar"></i> {{ form.created_at|date:"d/m/Y" }}
+                                    </small>
+                                </p>
+                            </div>
+                            <div class="card-footer">
+                                <a href="{% url 'view_form' form.id %}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-eye"></i> Ver Formulario
+                                </a>
+                                <span class="badge bg-success field-cost">
+                                    Costo: {{ form.total_cost }} monedas
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> No hay formularios públicos disponibles aún.
+                {% if user.is_authenticated %}
+                    <a href="{% url 'create_form' %}">¡Crea el primero!</a>
+                {% else %}
+                    <a href="{% url 'register' %}">¡Regístrate para crear uno!</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-body text-center">
+                <i class="fas fa-magic fa-3x text-primary mb-3"></i>
+                <h5>Sin Código</h5>
+                <p>Crea formularios complejos sin escribir una línea de código.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-body text-center">
+                <i class="fas fa-coins fa-3x text-warning mb-3"></i>
+                <h5>Sistema de Monedas</h5>
+                <p>Cada campo tiene un costo. Administra tus recursos inteligentemente.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-body text-center">
+                <i class="fas fa-users fa-3x text-success mb-3"></i>
+                <h5>Primer Usuario Admin</h5>
+                <p>El primer registrado obtiene privilegios especiales y 1000 monedas.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

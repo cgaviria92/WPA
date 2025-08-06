@@ -1,0 +1,201 @@
+{% extends 'mainapp/base.html' %}
+
+{% block title %}Editar {{ dynamic_form.title }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-edit"></i> Editando: {{ dynamic_form.title }}</h1>
+            <div>
+                <span class="badge bg-info">Costo Total: {{ dynamic_form.total_cost }} monedas</span>
+                <a href="{% url 'view_form' dynamic_form.id %}" class="btn btn-success btn-sm ms-2">
+                    <i class="fas fa-eye"></i> Vista Previa
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-list"></i> Campos del Formulario</h5>
+            </div>
+            <div class="card-body">
+                {% if fields %}
+                    <div id="form-fields">
+                        {% for field in fields %}
+                            <div class="field-item border rounded p-3 mb-3" data-field-id="{{ field.id }}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <h6>{{ field.label }}</h6>
+                                        <p class="text-muted mb-1">
+                                            <strong>Tipo:</strong> {{ field.field_type.display_name }}
+                                            <span class="field-cost">({{ field.field_type.cost }} monedas)</span>
+                                        </p>
+                                        {% if field.help_text %}
+                                            <p class="text-muted mb-1"><strong>Ayuda:</strong> {{ field.help_text }}</p>
+                                        {% endif %}
+                                        {% if field.is_required %}
+                                            <span class="badge bg-warning">Obligatorio</span>
+                                        {% endif %}
+                                        {% if field.choices %}
+                                            <div class="mt-2">
+                                                <strong>Opciones:</strong>
+                                                <ul class="list-unstyled mb-0">
+                                                    {% for choice in field.get_choices_list %}
+                                                        <li>• {{ choice }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="btn-group">
+                                        <button type="button" class="btn btn-outline-primary btn-sm move-up" title="Subir">
+                                            <i class="fas fa-arrow-up"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm move-down" title="Bajar">
+                                            <i class="fas fa-arrow-down"></i>
+                                        </button>
+                                        <a href="{% url 'delete_field' field.id %}" class="btn btn-outline-danger btn-sm" 
+                                           onclick="return confirm('¿Estás seguro? Recibirás un reembolso del 50%')">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-plus-circle fa-3x text-muted mb-3"></i>
+                        <h6>Este formulario no tiene campos aún</h6>
+                        <p class="text-muted">Agrega campos usando el panel de la derecha.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-plus"></i> Agregar Campo</h5>
+            </div>
+            <div class="card-body">
+                <form id="add-field-form">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de Campo</label>
+                        <select class="form-control" id="field_type_id" name="field_type_id" required>
+                            <option value="">Seleccionar tipo...</option>
+                            {% for field_type in field_types %}
+                                <option value="{{ field_type.id }}" data-cost="{{ field_type.cost }}">
+                                    {{ field_type.display_name }} ({{ field_type.cost }} monedas)
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Etiqueta del Campo</label>
+                        <input type="text" class="form-control" id="label" name="label" placeholder="Ej: Nombre completo" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Texto de Ayuda</label>
+                        <input type="text" class="form-control" id="help_text" name="help_text" placeholder="Opcional">
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="is_required" name="is_required">
+                            <label class="form-check-label" for="is_required">
+                                Campo obligatorio
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="choices-section" style="display: none;">
+                        <label class="form-label">Opciones (una por línea)</label>
+                        <textarea class="form-control" id="choices" name="choices" rows="4" placeholder="Opción 1&#10;Opción 2&#10;Opción 3"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100" id="add-field-btn">
+                        <i class="fas fa-plus"></i> Agregar Campo
+                    </button>
+                </form>
+
+                <div class="mt-3 p-3 bg-light rounded">
+                    <h6><i class="fas fa-info-circle"></i> Información</h6>
+                    <p class="small mb-1">Monedas disponibles: <strong>{{ user.monedas }}</strong></p>
+                    <p class="small mb-0">Costo del campo: <strong id="field-cost">0</strong> monedas</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fieldTypeSelect = document.getElementById('field_type_id');
+    const choicesSection = document.getElementById('choices-section');
+    const fieldCostDisplay = document.getElementById('field-cost');
+    const addFieldForm = document.getElementById('add-field-form');
+
+    // Mostrar/ocultar sección de opciones según el tipo de campo
+    fieldTypeSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const fieldTypeName = selectedOption.text.toLowerCase();
+        const cost = selectedOption.dataset.cost || 0;
+        
+        fieldCostDisplay.textContent = cost;
+        
+        if (fieldTypeName.includes('selección') || fieldTypeName.includes('choice')) {
+            choicesSection.style.display = 'block';
+        } else {
+            choicesSection.style.display = 'none';
+        }
+    });
+
+    // Enviar formulario via AJAX
+    addFieldForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            field_type_id: document.getElementById('field_type_id').value,
+            label: document.getElementById('label').value,
+            help_text: document.getElementById('help_text').value,
+            is_required: document.getElementById('is_required').checked,
+            choices: document.getElementById('choices').value
+        };
+
+        fetch('{% url "add_field_to_form" dynamic_form.id %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Recargar la página para mostrar el nuevo campo
+                window.location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al agregar el campo');
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,163 @@
+{% extends 'mainapp/base.html' %}
+
+{% block title %}Dashboard - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+        <p class="lead">Bienvenido, {{ user.username }}! Tienes {{ user.monedas }} monedas disponibles.</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body text-center">
+                <i class="fas fa-coins fa-2x mb-2"></i>
+                <h5>{{ user.monedas }}</h5>
+                <p class="mb-0">Monedas</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-list-alt fa-2x mb-2"></i>
+                <h5>{{ user_forms.count }}</h5>
+                <p class="mb-0">Formularios Creados</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-paper-plane fa-2x mb-2"></i>
+                <h5>
+                    {% for form in user_forms %}
+                        {{ form.submissions.count }}
+                    {% endfor %}
+                </h5>
+                <p class="mb-0">Envíos Totales</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="fas fa-user-crown fa-2x mb-2"></i>
+                <h5>{% if user.is_admin_user %}Admin{% else %}Usuario{% endif %}</h5>
+                <p class="mb-0">Rol</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-list-alt"></i> Mis Formularios</h5>
+                <a href="{% url 'create_form' %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus"></i> Nuevo Formulario
+                </a>
+            </div>
+            <div class="card-body">
+                {% if user_forms %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Título</th>
+                                    <th>Costo Total</th>
+                                    <th>Envíos</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for form in user_forms %}
+                                <tr>
+                                    <td>{{ form.title }}</td>
+                                    <td><span class="field-cost">{{ form.total_cost }} monedas</span></td>
+                                    <td>{{ form.submissions.count }}</td>
+                                    <td>
+                                        {% if form.is_active %}
+                                            <span class="badge bg-success">Activo</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactivo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'edit_form' form.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="{% url 'view_form' form.id %}" class="btn btn-sm btn-outline-info">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'form_submissions' form.id %}" class="btn btn-sm btn-outline-success">
+                                            <i class="fas fa-inbox"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-list-alt fa-3x text-muted mb-3"></i>
+                        <h6>No has creado ningún formulario aún</h6>
+                        <a href="{% url 'create_form' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Crear Primer Formulario
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-history"></i> Transacciones Recientes</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_transactions %}
+                    {% for transaction in recent_transactions %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                            <div>
+                                <small class="text-muted">{{ transaction.created_at|date:"d/m H:i" }}</small><br>
+                                <span class="small">{{ transaction.description }}</span>
+                            </div>
+                            <div class="text-end">
+                                {% if transaction.transaction_type == 'spend' %}
+                                    <span class="text-danger">-{{ transaction.amount }}</span>
+                                {% else %}
+                                    <span class="text-success">+{{ transaction.amount }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">No hay transacciones aún.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="fas fa-tools"></i> Tipos de Campo Disponibles</h5>
+            </div>
+            <div class="card-body">
+                {% for field_type in available_field_types %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>{{ field_type.display_name }}</span>
+                        <span class="field-cost">{{ field_type.cost }} monedas</span>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
