@@ -10,7 +10,6 @@ def main(page: ft.Page):
     username = ft.TextField(label="Usuario")
     password = ft.TextField(label="Contraseña", password=True, can_reveal_password=True)
     resultado = ft.Text()
-    terminos = ft.Checkbox(label="Acepto términos y condiciones")
 
     def mostrar_bienvenida(nombre):
         page.controls.clear()
@@ -38,10 +37,6 @@ def main(page: ft.Page):
             page.update()
 
     def register(e):
-        if not terminos.value:
-            resultado.value = "Debes aceptar los términos y condiciones."
-            page.update()
-            return
         try:
             r = requests.post(API_URL + "register/", json={
                 "username": username.value,
@@ -60,7 +55,6 @@ def main(page: ft.Page):
         ft.Column([
             username,
             password,
-            terminos,
             ft.Row([
                 ft.ElevatedButton("Login", on_click=login),
                 ft.ElevatedButton("Registrar", on_click=register),
