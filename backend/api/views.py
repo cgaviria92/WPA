@@ -4,6 +4,7 @@ from rest_framework import status
 from django.contrib.auth.models import User
 
 from .models import PlayerProfile
+from rest_framework.permissions import IsAuthenticated
 
 class RegisterView(APIView):
     def post(self, request):
@@ -16,3 +17,13 @@ class RegisterView(APIView):
         user = User.objects.create_user(username=username, password=password)
         PlayerProfile.objects.create(user=user)  # experiencia=0, coint=100 por defecto
         return Response({"message": "User created"}, status=status.HTTP_201_CREATED)
+
+class PlayerProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        profile = PlayerProfile.objects.get(user=request.user)
+        return Response({
+            "username": request.user.username,
+            "experiencia": profile.experiencia,
+            "coint": profile.coint
+        })

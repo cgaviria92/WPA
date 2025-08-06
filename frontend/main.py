@@ -11,11 +11,13 @@ def main(page: ft.Page):
     password = ft.TextField(label="Contraseña", password=True, can_reveal_password=True)
     resultado = ft.Text()
 
-    def mostrar_bienvenida(nombre):
+    def mostrar_bienvenida(nombre, experiencia, coint):
         page.controls.clear()
         page.add(
             ft.Column([
                 ft.Text(f"Bienvenido, {nombre}!", size=24, weight="bold"),
+                ft.Text(f"Monedas: {coint}"),
+                ft.Text(f"Experiencia: {experiencia}"),
                 ft.Text("Has iniciado sesión correctamente."),
             ])
         )
@@ -28,7 +30,15 @@ def main(page: ft.Page):
                 "password": password.value
             })
             if r.status_code == 200:
-                mostrar_bienvenida(username.value)
+                token = r.json()["access"]
+                headers = {"Authorization": f"Bearer {token}"}
+                r_profile = requests.get(API_URL + "profile/", headers=headers)
+                if r_profile.status_code == 200:
+                    data = r_profile.json()
+                    mostrar_bienvenida(data["username"], data["experiencia"], data["coint"])
+                else:
+                    resultado.value = "No se pudo obtener perfil."
+                    page.update()
             else:
                 resultado.value = f"Error: {r.json().get('detail', r.text)}"
                 page.update()
