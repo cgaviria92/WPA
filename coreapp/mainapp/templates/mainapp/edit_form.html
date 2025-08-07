@@ -59,7 +59,7 @@
                                         <button type="button" class="btn btn-outline-primary btn-sm move-down" title="Bajar">
                                             <i class="fas fa-arrow-down"></i>
                                         </button>
-                                        <a href="{% url 'delete_field' field.id %}" class="btn btn-outline-danger btn-sm" 
+                                        <a href="{% url 'delete_field' organization.slug field.id %}" class="btn btn-outline-danger btn-sm" 
                                            onclick="return confirm('¿Estás seguro? Recibirás un reembolso del 50%')">
                                             <i class="fas fa-trash"></i>
                                         </a>
@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function() {
             choices: document.getElementById('choices').value
         };
 
-        fetch('{% url "add_field_to_form" dynamic_form.id %}', {
+        fetch('{% url "add_field_to_form" organization.slug dynamic_form.id %}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
