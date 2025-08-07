@@ -43,9 +43,11 @@
                                 {% for field in fields %}
                                     <div class="col-md-6 mb-3">
                                         <strong>{{ field.label }}:</strong><br>
-                                        {% with field_name="field_"|add:field.id|stringformat:"s" %}
-                                            {% if submission.data|lookup:field_name %}
-                                                <span class="text-muted">{{ submission.data|lookup:field_name }}</span>
+                                        {% with field_key=field.id|field_key %}
+                                            <!-- Debug: Campo {{ field.id }} -> {{ field_key }} -->
+                                            <!-- Debug: Datos: {{ submission.data }} -->
+                                            {% if submission.data|lookup:field_key %}
+                                                <span class="text-muted">{{ submission.data|lookup:field_key }}</span>
                                             {% else %}
                                                 <span class="text-muted fst-italic">Sin respuesta</span>
                                             {% endif %}

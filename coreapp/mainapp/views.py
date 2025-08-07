@@ -473,6 +473,28 @@ def form_submissions(request, org_slug, form_id):
     submissions = dynamic_form.submissions.all().order_by('-submitted_at')
     fields = dynamic_form.fields.all().order_by('order')
     
+    # DEBUG: Información de debug
+    print(f"=== DEBUG form_submissions ===")
+    print(f"Formulario ID: {form_id}")
+    print(f"Organización: {organization.name}")
+    print(f"Total submissions: {submissions.count()}")
+    print(f"Campos del formulario:")
+    for field in fields:
+        print(f"  - Campo ID: {field.id}, Label: {field.label}, Order: {field.order}")
+    
+    print(f"Datos de submissions:")
+    for i, submission in enumerate(submissions[:3]):  # Solo primeras 3
+        print(f"  Submission {i+1}:")
+        print(f"    ID: {submission.id}")
+        print(f"    Usuario: {submission.submitted_by}")
+        print(f"    Fecha: {submission.submitted_at}")
+        print(f"    Datos: {submission.data}")
+        print(f"    Tipo de datos: {type(submission.data)}")
+        if isinstance(submission.data, dict):
+            for key, value in submission.data.items():
+                print(f"      {key}: {value}")
+    print(f"=== FIN DEBUG ===")
+    
     context = {
         'organization': organization,
         'membership': membership,
