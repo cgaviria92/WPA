@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import socket
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,7 +26,7 @@ SECRET_KEY = 'django-insecure-$+mrcxml3%gzz6$1_(^r-jseaymj5^cuqao9#(c0#85sr4k!5g
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']  # Permitir acceso desde cualquier IP en desarrollo
 
 
 AUTH_USER_MODEL = 'mainapp.CustomUser'
@@ -37,11 +38,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',  # CORS headers
     'mainapp',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # CORS debe ir primero
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -121,3 +124,58 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# CORS configuration for development - PERMITIR TODO
+CORS_ALLOW_ALL_ORIGINS = True  # Permite conexiones desde cualquier origen
+CORS_ALLOW_CREDENTIALS = True
+
+# Configuración de CSRF para permitir cualquier dominio
+CSRF_TRUSTED_ORIGINS = [
+    'http://*',
+    'https://*',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://0.0.0.0:8000',
+]
+
+# Para mayor compatibilidad, deshabilitar validación CSRF en desarrollo
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False
+
+# Cabeceras permitidas
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# Métodos HTTP permitidos
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Configuraciones adicionales para máxima compatibilidad
+CORS_PREFLIGHT_MAX_AGE = 86400
+CORS_EXPOSE_HEADERS = ['*']
+
+# Configuración de sesiones para acceso remoto
+SESSION_COOKIE_SECURE = False  # Solo para desarrollo
+SESSION_COOKIE_HTTPONLY = False
+SESSION_COOKIE_SAMESITE = None
+
+# Configuración adicional de seguridad para desarrollo
+SECURE_BROWSER_XSS_FILTER = False
+SECURE_CONTENT_TYPE_NOSNIFF = False
+X_FRAME_OPTIONS = 'ALLOWALL'
