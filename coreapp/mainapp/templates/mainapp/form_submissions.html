@@ -10,7 +10,7 @@
             <h1><i class="fas fa-inbox"></i> Respuestas: {{ dynamic_form.title }}</h1>
             <div>
                 <span class="badge bg-info">{{ submissions.count }} respuestas</span>
-                <a href="{% url 'edit_form' dynamic_form.id %}" class="btn btn-secondary btn-sm ms-2">
+                <a href="{% url 'edit_form' organization.slug dynamic_form.id %}" class="btn btn-secondary btn-sm ms-2">
                     <i class="fas fa-edit"></i> Editar Formulario
                 </a>
             </div>
