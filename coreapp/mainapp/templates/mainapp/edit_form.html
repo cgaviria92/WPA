@@ -9,7 +9,7 @@
             <h1><i class="fas fa-edit"></i> Editando: {{ dynamic_form.title }}</h1>
             <div>
                 <span class="badge bg-info">Costo Total: {{ dynamic_form.total_cost }} monedas</span>
-                <a href="{% url 'view_form' dynamic_form.id %}" class="btn btn-success btn-sm ms-2">
+                <a href="{% url 'view_form' organization.slug dynamic_form.id %}" class="btn btn-success btn-sm ms-2">
                     <i class="fas fa-eye"></i> Vista Previa
                 </a>
             </div>

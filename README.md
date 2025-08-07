@@ -1,14 +1,18 @@
-# 🚀 FormBuilder Pro - Sistema de Formularios Dinámicos
+# 🚀 FormBuilder Pro - Sistema de Formularios Dinámicos Multi-Tenant
 
-¡Bienvenido a FormBuilder Pro! Una plataforma dinámica y ajustable para crear formularios sin código, con un innovador sistema de economía digital basado en monedas.
+¡Bienvenido a FormBuilder Pro! Una plataforma dinámica y ajustable para crear formularios sin código, con un innovador sistema de economía digital basado en monedas y **arquitectura multi-tenant** para organizaciones.
 
 ## ✨ Características Principales
 
 - **🎯 Sin Código**: Crea formularios complejos sin programar
-- **💰 Sistema de Monedas**: Cada campo tiene un costo basado en su complejidad
-- **👑 Primer Usuario Admin**: El primer registrado obtiene privilegios especiales
+- **🏢 Multi-Tenant**: Cada organización tiene su propio espacio aislado
+- **� Gestión de Equipos**: Invita usuarios con diferentes roles y permisos
+- **�💰 Sistema de Monedas**: Cada campo tiene un costo basado en su complejidad
+- **👑 Administración Avanzada**: Roles de propietario, admin, editor y visualizador
 - **🔧 Completamente Dinámico**: Ajustable a cualquier necesidad
 - **📊 Gestión de Respuestas**: Recolecta y analiza datos fácilmente
+- **📋 Logs de Actividad**: Rastrea todas las acciones del equipo
+- **🔐 Control de Acceso**: Permisos granulares por organización
 
 ## 🛠 Configuración Inicial
 
@@ -59,15 +63,26 @@ Visita `http://localhost:8000` y regístrate como el primer usuario para ser adm
 
 ## 🎮 Cómo Usar
 
-### Como Primer Usuario (Admin)
-1. **Regístrate** como el primer usuario del sistema
-2. **Recibe automáticamente**:
-   - Privilegios de administrador
+### Registro y Configuración Inicial
+1. **Regístrate** en el sistema
+2. **Crea tu organización** o únete a una existente
+3. **Recibe automáticamente**:
    - 1000 monedas iniciales
-   - Acceso completo al sistema
+   - Rol de propietario de tu organización
+   - Acceso completo a la gestión
+
+### Gestión de Organizaciones
+1. **Crea tu organización**: Define nombre, descripción y logo
+2. **Invita miembros**: Agrega usuarios con diferentes roles:
+   - **Propietario**: Control total de la organización
+   - **Admin**: Gestión de usuarios y formularios (limitado)
+   - **Editor**: Crear y editar formularios
+   - **Visualizador**: Solo ver respuestas
+3. **Gestiona permisos**: Controla quién puede hacer qué
+4. **Monitorea actividad**: Ve logs detallados de todas las acciones
 
 ### Crear Formularios
-1. Ve al **Dashboard**
+1. Ve al **Dashboard** de tu organización
 2. Haz clic en **"Nuevo Formulario"**
 3. Completa título y descripción
 4. **Agrega campos dinámicamente**:
@@ -79,8 +94,8 @@ Visita `http://localhost:8000` y regístrate como el primer usuario para ser adm
 ### Gestionar Economía
 - **Cada campo cuesta monedas** según su complejidad
 - **Reembolso del 50%** al eliminar campos
-- **Monitorea transacciones** en tiempo real
-- **Los administradores pueden otorgar monedas** a otros usuarios
+- **Monitorea transacciones** en tiempo real por organización
+- **Los administradores pueden otorgar monedas** a miembros del equipo
 
 ## 🏗 Estructura del Proyecto
 
@@ -103,22 +118,39 @@ coreapp/
 
 ## 🎨 Funcionalidades Avanzadas
 
-### Sistema de Monedas
+### Sistema Multi-Tenant
+- Organizaciones completamente aisladas
+- Datos y usuarios separados por organización
+- Configuraciones independientes por empresa
+- Escalabilidad para múltiples clientes
+
+### Gestión de Equipos y Roles
+- **Propietario**: Control total de organización y configuraciones
+- **Administrador**: Gestión de usuarios y formularios (sin configuraciones)
+- **Editor**: Crear y modificar formularios, ver respuestas
+- **Visualizador**: Solo acceso de lectura a formularios y respuestas
+- Invitaciones por email y gestión masiva de usuarios
+
+### Sistema de Monedas por Organización
 - Costos dinámicos basados en complejidad del campo
 - Multiplicadores de almacenamiento
-- Historial completo de transacciones
+- Historial completo de transacciones por organización
 - Reembolsos por eliminación de campos
+- Gestión independiente por organización
 
-### Gestión de Usuarios
-- Primer usuario automáticamente admin
-- Sistema de roles y permisos
-- Tracking de actividad por usuario
+### Logs y Auditoría
+- Registro completo de actividades por organización
+- Filtros avanzados por usuario, acción y fecha
+- Exportación de logs para auditorías
+- Limpieza automática de logs antiguos
+- Trazabilidad completa de cambios
 
 ### Formularios Dinámicos
 - Campos configurables en tiempo real
 - Validaciones automáticas
 - Ordenamiento mediante drag & drop
 - Vista previa en tiempo real
+- Formularios públicos y privados por organización
 
 ## 🐛 Solución de Problemas
 
@@ -143,12 +175,16 @@ python manage.py setup_initial_data
 
 ## 🚀 Próximas Características
 
-- [ ] Sistema de plantillas de formularios
-- [ ] Exportación de datos (CSV, Excel)
-- [ ] Notificaciones por email
-- [ ] API REST para integraciones
-- [ ] Temas personalizables
-- [ ] Análisis y estadísticas avanzadas
+- [ ] Dashboard analítico avanzado por organización
+- [ ] Sistema de plantillas de formularios compartidas
+- [ ] Exportación de datos (CSV, Excel) con filtros avanzados
+- [ ] Notificaciones por email y webhooks
+- [ ] API REST para integraciones con sistemas externos
+- [ ] Temas personalizables por organización
+- [ ] Análisis y estadísticas avanzadas con gráficos
+- [ ] Integración con servicios de pago para monedas
+- [ ] Sistema de backup y restauración por organización
+- [ ] Modo offline para formularios
 
 ## 🤝 Contribuir
 

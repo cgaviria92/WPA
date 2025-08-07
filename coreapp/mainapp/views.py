@@ -5,14 +5,50 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from .models import CustomUser, FieldType, DynamicForm, DynamicFormField, FormSubmission, CoinTransaction
-from .forms import DynamicFormCreationForm, DynamicFormFieldForm, UserRegistrationForm
+from django.utils.text import slugify
+from django.db import transaction
+from .models import (
+    CustomUser, Organization, OrganizationMembership, FieldType, 
+    DynamicForm, DynamicFormField, FormSubmission, CoinTransaction, ActivityLog
+)
+from .forms import (
+    DynamicFormCreationForm, DynamicFormFieldForm, UserRegistrationForm,
+    OrganizationCreationForm, UserInvitationForm, BulkUserInviteForm
+)
 import json
 
+def get_client_ip(request):
+    """Obtener IP del cliente"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+def log_activity(user, action, description, organization=None, form=None, request=None):
+    """Crear log de actividad"""
+    ActivityLog.objects.create(
+        user=user,
+        organization=organization,
+        action=action,
+        description=description,
+        related_form=form,
+        ip_address=get_client_ip(request) if request else None,
+        user_agent=request.META.get('HTTP_USER_AGENT', '') if request else ''
+    )
+
 def index(request):
-    """Página principal"""
-    forms = DynamicForm.objects.filter(is_active=True).order_by('-created_at')
-    return render(request, 'mainapp/index.html', {'forms': forms})
+    """Página principal - Muestra formularios públicos de todas las organizaciones"""
+    public_forms = DynamicForm.objects.filter(is_active=True, is_public=True).order_by('-created_at')
+    
+    context = {
+        'forms': public_forms,
+        'total_organizations': Organization.objects.filter(is_active=True).count(),
+        'total_forms': DynamicForm.objects.filter(is_active=True).count(),
+        'total_users': CustomUser.objects.count(),
+    }
+    return render(request, 'mainapp/index.html', context)
 
 def register(request):
     """Registro de usuarios"""
@@ -21,48 +57,178 @@ def register(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
-            if user.is_admin_user:
-                messages.success(request, '¡Felicidades! Eres el primer usuario y ahora eres administrador con 1000 monedas.')
-            else:
-                messages.success(request, 'Registro exitoso. Bienvenido al sistema.')
-            return redirect('dashboard')
+            
+            # Log de registro
+            log_activity(user, 'login', f'Usuario registrado: {user.username}', request=request)
+            
+            messages.success(request, 'Registro exitoso. ¡Bienvenido al sistema!')
+            return redirect('select_organization')
     else:
         form = UserRegistrationForm()
     return render(request, 'registration/register.html', {'form': form})
 
 @login_required
-def dashboard(request):
-    """Panel de control del usuario"""
-    user_forms = DynamicForm.objects.filter(creator=request.user).order_by('-created_at')
-    recent_transactions = CoinTransaction.objects.filter(user=request.user).order_by('-created_at')[:5]
+@login_required
+def select_organization(request):
+    """Seleccionar organización o crear nueva"""
+    try:
+        user_memberships = request.user.memberships.filter(
+            is_active=True,
+            organization__is_active=True,
+            organization__slug__isnull=False
+        ).select_related('organization')
+    except Exception as e:
+        # En caso de error, crear una lista vacía
+        user_memberships = []
     
     context = {
-        'user_forms': user_forms,
-        'recent_transactions': recent_transactions,
+        'user_memberships': user_memberships,
+    }
+    return render(request, 'mainapp/select_organization.html', context)
+
+@login_required
+def create_organization(request):
+    """Crear nueva organización"""
+    if request.method == 'POST':
+        form = OrganizationCreationForm(request.POST, request.FILES)
+        if form.is_valid():
+            with transaction.atomic():
+                # Crear organización
+                organization = form.save(commit=False)
+                organization.owner = request.user
+                organization.slug = slugify(organization.name)
+                organization.save()
+                
+                # Crear membresía del propietario
+                OrganizationMembership.objects.create(
+                    user=request.user,
+                    organization=organization,
+                    role='owner',
+                    invited_by=request.user
+                )
+                
+                # Log de actividad
+                log_activity(
+                    request.user, 'create_organization', 
+                    f'Organización creada: {organization.name}',
+                    organization=organization, request=request
+                )
+                
+                messages.success(request, f'Organización "{organization.name}" creada exitosamente.')
+                return redirect('dashboard', org_slug=organization.slug)
+    else:
+        form = OrganizationCreationForm()
+    
+    return render(request, 'mainapp/create_organization.html', {'form': form})
+
+@login_required
+def dashboard(request, org_slug):
+    """Dashboard de la organización"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar que el usuario pertenece a la organización
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, 
+            organization=organization, 
+            is_active=True
+        )
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
+    # Obtener datos del dashboard
+    org_forms = organization.forms.filter(is_active=True).order_by('-created_at')
+    recent_submissions = FormSubmission.objects.filter(
+        form__organization=organization
+    ).order_by('-submitted_at')[:10]
+    
+    recent_activities = organization.activity_logs.all()[:10]
+    team_members = organization.memberships.filter(is_active=True).order_by('-joined_at')
+    
+    # Estadísticas
+    stats = {
+        'total_forms': org_forms.count(),
+        'total_submissions': FormSubmission.objects.filter(form__organization=organization).count(),
+        'total_members': team_members.count(),
+        'total_cost': sum(form.total_cost for form in org_forms),
+    }
+    
+    context = {
+        'organization': organization,
+        'membership': membership,
+        'org_forms': org_forms,
+        'recent_submissions': recent_submissions,
+        'recent_activities': recent_activities,
+        'team_members': team_members,
+        'stats': stats,
         'available_field_types': FieldType.objects.all(),
     }
     return render(request, 'mainapp/dashboard.html', context)
 
 @login_required
-def create_form(request):
+def create_form(request, org_slug):
     """Crear nuevo formulario dinámico"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_edit_forms():
+            messages.error(request, 'No tienes permisos para crear formularios.')
+            return redirect('dashboard', org_slug=org_slug)
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
     if request.method == 'POST':
         form = DynamicFormCreationForm(request.POST)
         if form.is_valid():
-            dynamic_form = form.save(commit=False)
-            dynamic_form.creator = request.user
-            dynamic_form.save()
-            messages.success(request, 'Formulario creado exitosamente.')
-            return redirect('edit_form', form_id=dynamic_form.id)
+            with transaction.atomic():
+                dynamic_form = form.save(commit=False)
+                dynamic_form.organization = organization
+                dynamic_form.creator = request.user
+                dynamic_form.save()
+                
+                # Log de actividad
+                log_activity(
+                    request.user, 'create_form',
+                    f'Formulario creado: {dynamic_form.title}',
+                    organization=organization, form=dynamic_form, request=request
+                )
+                
+                messages.success(request, 'Formulario creado exitosamente.')
+                return redirect('edit_form', org_slug=org_slug, form_id=dynamic_form.id)
     else:
         form = DynamicFormCreationForm()
     
-    return render(request, 'mainapp/create_form.html', {'form': form})
+    context = {
+        'form': form,
+        'organization': organization,
+        'membership': membership,
+    }
+    return render(request, 'mainapp/create_form.html', context)
 
 @login_required
-def edit_form(request, form_id):
+def edit_form(request, org_slug, form_id):
     """Editar formulario dinámico"""
-    dynamic_form = get_object_or_404(DynamicForm, id=form_id, creator=request.user)
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    dynamic_form = get_object_or_404(DynamicForm, id=form_id, organization=organization)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_edit_forms():
+            messages.error(request, 'No tienes permisos para editar formularios.')
+            return redirect('dashboard', org_slug=org_slug)
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
     fields = dynamic_form.fields.all().order_by('order')
     field_types = FieldType.objects.all()
     
@@ -72,6 +238,8 @@ def edit_form(request, form_id):
             'No hay tipos de campo disponibles. Contacta al administrador para configurar el sistema.')
     
     context = {
+        'organization': organization,
+        'membership': membership,
         'dynamic_form': dynamic_form,
         'fields': fields,
         'field_types': field_types,
@@ -79,12 +247,25 @@ def edit_form(request, form_id):
     }
     return render(request, 'mainapp/edit_form.html', context)
 
+# ... (continúo con el resto de las vistas en el siguiente bloque)
+
 @login_required
 @csrf_exempt
 @require_http_methods(["POST"])
-def add_field_to_form(request, form_id):
+def add_field_to_form(request, org_slug, form_id):
     """Agregar campo a formulario (AJAX)"""
-    dynamic_form = get_object_or_404(DynamicForm, id=form_id, creator=request.user)
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    dynamic_form = get_object_or_404(DynamicForm, id=form_id, organization=organization)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_edit_forms():
+            return JsonResponse({'success': False, 'error': 'Sin permisos para editar formularios'})
+    except OrganizationMembership.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Sin acceso a esta organización'})
     
     try:
         data = json.loads(request.body)
@@ -97,38 +278,48 @@ def add_field_to_form(request, form_id):
         field_type = get_object_or_404(FieldType, id=field_type_id)
         
         # Verificar si el usuario puede costear el campo
-        if not request.user.can_afford(field_type.cost):
+        if request.user.monedas < field_type.cost:
             return JsonResponse({
                 'success': False,
                 'error': f'No tienes suficientes monedas. Necesitas {field_type.cost} monedas.'
             })
         
-        # Crear el campo
-        field = DynamicFormField.objects.create(
-            form=dynamic_form,
-            field_type=field_type,
-            label=label,
-            is_required=is_required,
-            help_text=help_text,
-            choices=choices,
-            order=dynamic_form.fields.count()
-        )
-        
-        # Cobrar las monedas
-        request.user.spend_coins(field_type.cost)
-        
-        # Registrar la transacción
-        CoinTransaction.objects.create(
-            user=request.user,
-            transaction_type='spend',
-            amount=field_type.cost,
-            description=f'Campo agregado: {label} ({field_type.display_name})',
-            related_form=dynamic_form
-        )
-        
-        # Actualizar costo total del formulario
-        dynamic_form.total_cost = dynamic_form.calculate_total_cost()
-        dynamic_form.save()
+        with transaction.atomic():
+            # Crear el campo
+            field = DynamicFormField.objects.create(
+                form=dynamic_form,
+                field_type=field_type,
+                label=label,
+                is_required=is_required,
+                help_text=help_text,
+                choices=choices,
+                order=dynamic_form.fields.count()
+            )
+            
+            # Cobrar las monedas
+            request.user.monedas -= field_type.cost
+            request.user.save()
+            
+            # Registrar la transacción
+            CoinTransaction.objects.create(
+                user=request.user,
+                organization=organization,
+                transaction_type='spend',
+                amount=field_type.cost,
+                description=f'Campo agregado: {label} ({field_type.display_name})',
+                related_form=dynamic_form
+            )
+            
+            # Actualizar costo total del formulario
+            dynamic_form.total_cost = dynamic_form.calculate_total_cost()
+            dynamic_form.save()
+            
+            # Log de actividad
+            log_activity(
+                request.user, 'add_field',
+                f'Campo agregado: {label} en {dynamic_form.title}',
+                organization=organization, form=dynamic_form, request=request
+            )
         
         return JsonResponse({
             'success': True,
@@ -140,38 +331,78 @@ def add_field_to_form(request, form_id):
         return JsonResponse({'success': False, 'error': str(e)})
 
 @login_required
-def delete_field(request, field_id):
+def delete_field(request, org_slug, field_id):
     """Eliminar campo de formulario"""
-    field = get_object_or_404(DynamicFormField, id=field_id, form__creator=request.user)
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    field = get_object_or_404(DynamicFormField, id=field_id, form__organization=organization)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_edit_forms():
+            messages.error(request, 'No tienes permisos para eliminar campos.')
+            return redirect('dashboard', org_slug=org_slug)
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
     form_id = field.form.id
     
-    # Reembolsar monedas (opcional - puedes quitar esto si no quieres reembolsos)
-    refund_amount = field.field_type.cost // 2  # Reembolso del 50%
-    request.user.monedas += refund_amount
-    request.user.save()
-    
-    # Registrar transacción de reembolso
-    CoinTransaction.objects.create(
-        user=request.user,
-        transaction_type='earn',
-        amount=refund_amount,
-        description=f'Reembolso por eliminar campo: {field.label}',
-        related_form=field.form
-    )
-    
-    field.delete()
-    
-    # Actualizar costo total del formulario
-    dynamic_form = field.form
-    dynamic_form.total_cost = dynamic_form.calculate_total_cost()
-    dynamic_form.save()
+    with transaction.atomic():
+        # Reembolsar monedas (50% del costo original)
+        refund_amount = field.field_type.cost // 2
+        request.user.monedas += refund_amount
+        request.user.save()
+        
+        # Registrar transacción de reembolso
+        CoinTransaction.objects.create(
+            user=request.user,
+            organization=organization,
+            transaction_type='refund',
+            amount=refund_amount,
+            description=f'Reembolso por eliminar campo: {field.label}',
+            related_form=field.form
+        )
+        
+        # Log de actividad
+        log_activity(
+            request.user, 'remove_field',
+            f'Campo eliminado: {field.label} de {field.form.title}',
+            organization=organization, form=field.form, request=request
+        )
+        
+        field.delete()
+        
+        # Actualizar costo total del formulario
+        dynamic_form = field.form
+        dynamic_form.total_cost = dynamic_form.calculate_total_cost()
+        dynamic_form.save()
     
     messages.success(request, f'Campo eliminado. Reembolso: {refund_amount} monedas.')
-    return redirect('edit_form', form_id=form_id)
+    return redirect('edit_form', org_slug=org_slug, form_id=form_id)
 
-def view_form(request, form_id):
+def view_form(request, org_slug, form_id):
     """Ver y enviar datos a un formulario público"""
-    dynamic_form = get_object_or_404(DynamicForm, id=form_id, is_active=True)
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    dynamic_form = get_object_or_404(DynamicForm, id=form_id, organization=organization, is_active=True)
+    
+    # Verificar si el formulario es público o el usuario tiene acceso
+    has_access = dynamic_form.is_public
+    if not has_access and request.user.is_authenticated:
+        try:
+            membership = OrganizationMembership.objects.get(
+                user=request.user, organization=organization, is_active=True
+            )
+            has_access = True
+        except OrganizationMembership.DoesNotExist:
+            pass
+    
+    if not has_access:
+        messages.error(request, 'No tienes acceso a este formulario.')
+        return redirect('index')
+    
     fields = dynamic_form.fields.all().order_by('order')
     
     if request.method == 'POST':
@@ -190,16 +421,28 @@ def view_form(request, form_id):
                 submission_data[field_name] = value
         
         if valid:
-            # Guardar envío
-            FormSubmission.objects.create(
-                form=dynamic_form,
-                submitted_by=request.user if request.user.is_authenticated else None,
-                data=submission_data
-            )
+            with transaction.atomic():
+                # Guardar envío
+                submission = FormSubmission.objects.create(
+                    form=dynamic_form,
+                    submitted_by=request.user if request.user.is_authenticated else None,
+                    data=submission_data,
+                    ip_address=get_client_ip(request)
+                )
+                
+                # Log de actividad
+                if request.user.is_authenticated:
+                    log_activity(
+                        request.user, 'submit_form',
+                        f'Formulario enviado: {dynamic_form.title}',
+                        organization=organization, form=dynamic_form, request=request
+                    )
+                
             messages.success(request, 'Formulario enviado exitosamente.')
             return redirect('form_success')
     
     context = {
+        'organization': organization,
         'dynamic_form': dynamic_form,
         'fields': fields,
     }
@@ -210,15 +453,378 @@ def form_success(request):
     return render(request, 'mainapp/form_success.html')
 
 @login_required
-def form_submissions(request, form_id):
-    """Ver envíos de un formulario (solo el creador)"""
-    dynamic_form = get_object_or_404(DynamicForm, id=form_id, creator=request.user)
+def form_submissions(request, org_slug, form_id):
+    """Ver envíos de un formulario (solo miembros con permisos)"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    dynamic_form = get_object_or_404(DynamicForm, id=form_id, organization=organization)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_view_submissions():
+            messages.error(request, 'No tienes permisos para ver las respuestas.')
+            return redirect('dashboard', org_slug=org_slug)
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
     submissions = dynamic_form.submissions.all().order_by('-submitted_at')
     fields = dynamic_form.fields.all().order_by('order')
     
     context = {
+        'organization': organization,
+        'membership': membership,
         'dynamic_form': dynamic_form,
         'submissions': submissions,
         'fields': fields,
     }
     return render(request, 'mainapp/form_submissions.html', context)
+
+@login_required
+def team_management(request, org_slug):
+    """Gestión del equipo de la organización"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_manage_users():
+            messages.error(request, 'No tienes permisos para gestionar usuarios.')
+            return redirect('dashboard', org_slug=org_slug)
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
+    team_members = organization.memberships.filter(is_active=True).order_by('-joined_at')
+    
+    # Formularios para invitación
+    invite_form = UserInvitationForm()
+    bulk_invite_form = BulkUserInviteForm()
+    
+    context = {
+        'organization': organization,
+        'membership': membership,
+        'members': team_members,
+        'user_membership': membership,
+        'invite_form': invite_form,
+        'bulk_invite_form': bulk_invite_form,
+    }
+    return render(request, 'mainapp/team_management.html', context)
+
+@login_required
+def activity_logs(request, org_slug):
+    """Ver logs de actividad de la organización"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_manage_users():
+            messages.error(request, 'No tienes permisos para ver los logs.')
+            return redirect('dashboard', org_slug=org_slug)
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
+    logs = organization.activity_logs.all().order_by('-created_at')
+    
+    # Filtros
+    user_filter = request.GET.get('user')
+    action_filter = request.GET.get('action')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    
+    if user_filter:
+        logs = logs.filter(user_id=user_filter)
+    if action_filter:
+        logs = logs.filter(action=action_filter)
+    if date_from:
+        logs = logs.filter(created_at__date__gte=date_from)
+    if date_to:
+        logs = logs.filter(created_at__date__lte=date_to)
+    
+    # Estadísticas
+    from django.db.models import Count
+    from datetime import datetime, timedelta
+    
+    stats = {
+        'total_logs': logs.count(),
+        'forms_created': logs.filter(action='create_form').count(),
+        'submissions_received': logs.filter(action='form_submission').count(),
+        'users_active': logs.filter(
+            created_at__gte=datetime.now() - timedelta(days=30)
+        ).values('user').distinct().count(),
+    }
+    
+    # Paginación
+    from django.core.paginator import Paginator
+    paginator = Paginator(logs, 25)  # 25 logs por página
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'organization': organization,
+        'membership': membership,
+        'logs': page_obj,
+        'page_obj': page_obj,
+        'is_paginated': page_obj.has_other_pages(),
+        'members': organization.members.filter(is_active=True),
+        'stats': stats,
+    }
+    return render(request, 'mainapp/activity_logs.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def invite_user(request, org_slug):
+    """Invitar usuario a la organización"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_manage_users():
+            return JsonResponse({'success': False, 'error': 'Sin permisos'})
+    except OrganizationMembership.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Sin acceso'})
+    
+    form = UserInvitationForm(request.POST)
+    if form.is_valid():
+        email = form.cleaned_data['email']
+        role = form.cleaned_data['role']
+        
+        # Verificar si el usuario ya existe
+        try:
+            invited_user = CustomUser.objects.get(email=email)
+            # Verificar si ya es miembro
+            if OrganizationMembership.objects.filter(
+                user=invited_user, organization=organization, is_active=True
+            ).exists():
+                messages.error(request, f'{email} ya es miembro de esta organización.')
+            else:
+                # Agregar a la organización
+                OrganizationMembership.objects.create(
+                    user=invited_user,
+                    organization=organization,
+                    role=role,
+                    invited_by=request.user
+                )
+                
+                # Log de actividad
+                log_activity(
+                    user=request.user,
+                    action='user_invited',
+                    description=f'Usuario {email} invitado con rol {role}',
+                    organization=organization,
+                    request=request
+                )
+                
+                messages.success(request, f'Usuario {email} agregado exitosamente.')
+        except CustomUser.DoesNotExist:
+            messages.error(request, f'No existe un usuario con email {email}. El usuario debe registrarse primero.')
+    
+    return redirect('team_management', org_slug=org_slug)
+
+
+@login_required
+@require_http_methods(["POST"])
+def bulk_invite_users(request, org_slug):
+    """Invitar múltiples usuarios a la organización"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_manage_users():
+            return JsonResponse({'success': False, 'error': 'Sin permisos'})
+    except OrganizationMembership.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Sin acceso'})
+    
+    users_data = request.POST.get('users_data', '')
+    
+    if not users_data:
+        messages.error(request, 'No se proporcionaron datos de usuarios.')
+        return redirect('team_management', org_slug=org_slug)
+    
+    success_count = 0
+    error_count = 0
+    
+    # Procesar datos: email1,role1;email2,role2
+    for line in users_data.strip().split(';'):
+        if not line.strip():
+            continue
+        
+        try:
+            parts = line.strip().split(',')
+            if len(parts) != 2:
+                error_count += 1
+                continue
+            
+            email, role = parts[0].strip(), parts[1].strip()
+            
+            if role not in ['admin', 'editor', 'viewer']:
+                error_count += 1
+                continue
+            
+            # Verificar si el usuario existe
+            try:
+                invited_user = CustomUser.objects.get(email=email)
+                # Verificar si ya es miembro
+                if not OrganizationMembership.objects.filter(
+                    user=invited_user, organization=organization, is_active=True
+                ).exists():
+                    OrganizationMembership.objects.create(
+                        user=invited_user,
+                        organization=organization,
+                        role=role,
+                        invited_by=request.user
+                    )
+                    success_count += 1
+            except CustomUser.DoesNotExist:
+                error_count += 1
+        except Exception:
+            error_count += 1
+    
+    # Log de actividad
+    log_activity(
+        user=request.user,
+        action='bulk_invite',
+        description=f'Invitación masiva: {success_count} exitosos, {error_count} errores',
+        organization=organization,
+        request=request
+    )
+    
+    if success_count > 0:
+        messages.success(request, f'{success_count} usuarios agregados exitosamente.')
+    if error_count > 0:
+        messages.warning(request, f'{error_count} usuarios no pudieron ser agregados.')
+    
+    return redirect('team_management', org_slug=org_slug)
+
+
+@login_required
+@require_http_methods(["POST"])
+def change_member_role(request, org_slug, membership_id):
+    """Cambiar rol de un miembro"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    target_membership = get_object_or_404(OrganizationMembership, id=membership_id, organization=organization)
+    
+    # Verificar permisos
+    try:
+        user_membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        
+        # Solo owner puede cambiar cualquier rol, admin puede cambiar roles menores
+        if user_membership.role == 'owner' or (
+            user_membership.role == 'admin' and target_membership.role not in ['owner', 'admin']
+        ):
+            data = json.loads(request.body)
+            new_role = data.get('role')
+            
+            if new_role in ['admin', 'editor', 'viewer']:
+                old_role = target_membership.role
+                target_membership.role = new_role
+                target_membership.save()
+                
+                # Log de actividad
+                log_activity(
+                    user=request.user,
+                    action='role_changed',
+                    description=f'Rol de {target_membership.user.username} cambiado de {old_role} a {new_role}',
+                    organization=organization,
+                    request=request
+                )
+                
+                return JsonResponse({'success': True})
+        
+        return JsonResponse({'success': False, 'error': 'Sin permisos'})
+        
+    except OrganizationMembership.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Sin acceso'})
+
+
+@login_required
+@require_http_methods(["POST"])
+def remove_member(request, org_slug, membership_id):
+    """Remover miembro de la organización"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    target_membership = get_object_or_404(OrganizationMembership, id=membership_id, organization=organization)
+    
+    # Verificar permisos
+    try:
+        user_membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        
+        # No se puede remover al owner, solo owner puede remover admin
+        if target_membership.role == 'owner':
+            return JsonResponse({'success': False, 'error': 'No se puede remover al propietario'})
+        
+        if user_membership.role == 'owner' or (
+            user_membership.role == 'admin' and target_membership.role not in ['owner', 'admin']
+        ):
+            username = target_membership.user.username
+            target_membership.is_active = False
+            target_membership.save()
+            
+            # Log de actividad
+            log_activity(
+                user=request.user,
+                action='user_removed',
+                description=f'Usuario {username} removido de la organización',
+                organization=organization,
+                request=request
+            )
+            
+            return JsonResponse({'success': True})
+        
+        return JsonResponse({'success': False, 'error': 'Sin permisos'})
+        
+    except OrganizationMembership.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Sin acceso'})
+
+
+@login_required
+@require_http_methods(["POST"])
+def clear_old_logs(request, org_slug):
+    """Limpiar logs antiguos (más de 90 días)"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if membership.role not in ['owner', 'admin']:
+            return JsonResponse({'success': False, 'error': 'Sin permisos'})
+    except OrganizationMembership.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Sin acceso'})
+    
+    from datetime import datetime, timedelta
+    cutoff_date = datetime.now() - timedelta(days=90)
+    
+    deleted_count, _ = organization.activity_logs.filter(
+        created_at__lt=cutoff_date
+    ).delete()
+    
+    # Log de actividad
+    log_activity(
+        user=request.user,
+        action='logs_cleared',
+        description=f'Se eliminaron {deleted_count} logs antiguos',
+        organization=organization,
+        request=request
+    )
+    
+    return JsonResponse({'success': True, 'deleted_count': deleted_count})

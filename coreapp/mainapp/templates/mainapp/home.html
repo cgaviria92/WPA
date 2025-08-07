@@ -13,8 +13,8 @@
                     <i class="fas fa-user-plus"></i> ¡Regístrate Ahora!
                 </a>
             {% else %}
-                <a class="btn btn-warning btn-lg" href="{% url 'dashboard' %}">
-                    <i class="fas fa-tachometer-alt"></i> Ir al Dashboard
+                <a class="btn btn-warning btn-lg" href="{% url 'select_organization' %}">
+                    <i class="fas fa-building"></i> Mis Organizaciones
                 </a>
             {% endif %}
         </div>
@@ -40,7 +40,7 @@
                                 </p>
                             </div>
                             <div class="card-footer">
-                                <a href="{% url 'view_form' form.id %}" class="btn btn-primary btn-sm">
+                                <a href="{% url 'view_form' form.organization.slug form.id %}" class="btn btn-primary btn-sm">
                                     <i class="fas fa-eye"></i> Ver Formulario
                                 </a>
                                 <span class="badge bg-success field-cost">

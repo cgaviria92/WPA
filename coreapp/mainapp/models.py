@@ -5,27 +5,78 @@ import json
 
 class CustomUser(AbstractUser):
     monedas = models.IntegerField(default=1000)
-    is_admin_user = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_admin_user = models.BooleanField(default=False, verbose_name="Es usuario administrador")
     
-    def save(self, *args, **kwargs):
-        # Si es el primer usuario, se convierte en admin y obtiene monedas extra
-        if not self.pk and not CustomUser.objects.exists():
-            self.is_admin_user = True
-            self.is_staff = True
-            self.is_superuser = True
-            self.monedas = 1000  # Monedas iniciales para el admin
-        super().save(*args, **kwargs)
+    def __str__(self):
+        return self.username
+
+
+class Organization(models.Model):
+    """Organización/Empresa - Sistema Multi-Tenant"""
+    name = models.CharField(max_length=200, verbose_name="Nombre de la Organización")
+    description = models.TextField(blank=True, verbose_name="Descripción")
+    owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='owned_organizations', 
+                             verbose_name="Propietario")
+    slug = models.SlugField(unique=True, verbose_name="Slug único")
+    logo = models.ImageField(upload_to='organizations/', blank=True, null=True, verbose_name="Logo")
+    is_active = models.BooleanField(default=True, verbose_name="Activa")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
-    def can_afford(self, cost):
-        return self.monedas >= cost
+    # Configuraciones
+    max_users = models.IntegerField(default=10, verbose_name="Máximo de usuarios")
+    max_forms = models.IntegerField(default=50, verbose_name="Máximo de formularios")
     
-    def spend_coins(self, amount):
-        if self.can_afford(amount):
-            self.monedas -= amount
-            self.save()
-            return True
-        return False
+    class Meta:
+        verbose_name = "Organización"
+        verbose_name_plural = "Organizaciones"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return self.name
+    
+    def can_add_user(self):
+        return self.memberships.filter(is_active=True).count() < self.max_users
+    
+    def can_add_form(self):
+        return self.forms.filter(is_active=True).count() < self.max_forms
+
+
+class OrganizationMembership(models.Model):
+    """Membresía de usuario en organización con roles"""
+    ROLE_CHOICES = [
+        ('owner', 'Propietario'),
+        ('admin', 'Administrador'),
+        ('editor', 'Editor'),
+        ('viewer', 'Visualizador'),
+        ('form_filler', 'Llenador de Formularios'),
+    ]
+    
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='memberships')
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='memberships')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='viewer')
+    is_active = models.BooleanField(default=True)
+    invited_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, 
+                                   related_name='invitations_sent')
+    joined_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['user', 'organization']
+        verbose_name = "Membresía"
+        verbose_name_plural = "Membresías"
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.organization.name} ({self.get_role_display()})"
+    
+    def can_edit_forms(self):
+        return self.role in ['owner', 'admin', 'editor']
+    
+    def can_view_submissions(self):
+        return self.role in ['owner', 'admin', 'editor', 'viewer']
+    
+    def can_manage_users(self):
+        return self.role in ['owner', 'admin']
 
 
 class FieldType(models.Model):
@@ -47,24 +98,29 @@ class FieldType(models.Model):
     storage_multiplier = models.FloatField(default=1.0, help_text="Multiplicador de costo por almacenamiento")
     
     def __str__(self):
-        return f"{self.display_name} (${self.cost} monedas)"
+        return f"{self.display_name} ({self.cost} monedas)"
 
 
 class DynamicForm(models.Model):
-    """Formulario dinámico creado por usuarios"""
+    """Formulario dinámico creado por usuarios dentro de una organización"""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='forms')
     creator = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='created_forms')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    is_public = models.BooleanField(default=False, help_text="¿Puede ser llenado por usuarios no registrados?")
     total_cost = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
     
     def calculate_total_cost(self):
         return sum(field.field_type.cost for field in self.fields.all())
     
     def __str__(self):
-        return self.title
+        return f"{self.organization.name} - {self.title}"
 
 
 class DynamicFormField(models.Model):
@@ -102,6 +158,10 @@ class FormSubmission(models.Model):
     submitted_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
     submitted_at = models.DateTimeField(auto_now_add=True)
     data = models.JSONField(help_text="Datos del formulario en formato JSON")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-submitted_at']
     
     def __str__(self):
         return f"Envío de {self.form.title} - {self.submitted_at}"
@@ -113,14 +173,55 @@ class CoinTransaction(models.Model):
         ('spend', 'Gasto'),
         ('earn', 'Ganancia'),
         ('admin_grant', 'Otorgado por Admin'),
+        ('refund', 'Reembolso'),
     ]
     
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='transactions')
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True, 
+                                   related_name='transactions')
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
     amount = models.IntegerField()
     description = models.CharField(max_length=500)
     related_form = models.ForeignKey(DynamicForm, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
+    class Meta:
+        ordering = ['-created_at']
+    
     def __str__(self):
         return f"{self.user.username} - {self.transaction_type} - {self.amount} monedas"
+
+
+class ActivityLog(models.Model):
+    """Log de actividades del sistema"""
+    ACTION_TYPES = [
+        ('create_organization', 'Crear Organización'),
+        ('create_form', 'Crear Formulario'),
+        ('edit_form', 'Editar Formulario'),
+        ('delete_form', 'Eliminar Formulario'),
+        ('add_field', 'Agregar Campo'),
+        ('remove_field', 'Eliminar Campo'),
+        ('invite_user', 'Invitar Usuario'),
+        ('change_role', 'Cambiar Rol'),
+        ('submit_form', 'Enviar Formulario'),
+        ('login', 'Iniciar Sesión'),
+        ('logout', 'Cerrar Sesión'),
+    ]
+    
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='activity_logs')
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True,
+                                   related_name='activity_logs')
+    action = models.CharField(max_length=30, choices=ACTION_TYPES)
+    description = models.TextField()
+    related_form = models.ForeignKey(DynamicForm, on_delete=models.SET_NULL, null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Log de Actividad"
+        verbose_name_plural = "Logs de Actividad"
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.get_action_display()} - {self.created_at}"

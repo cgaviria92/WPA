@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
-from .models import CustomUser, DynamicForm, DynamicFormField, FieldType
+from .models import CustomUser, DynamicForm, DynamicFormField, FieldType, Organization
 
 class UserRegistrationForm(UserCreationForm):
     email = forms.EmailField(required=True)
@@ -9,6 +9,12 @@ class UserRegistrationForm(UserCreationForm):
         model = CustomUser
         fields = ('username', 'email', 'password1', 'password2')
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Mejorar estilos de los campos
+        for field_name, field in self.fields.items():
+            field.widget.attrs['class'] = 'form-control'
+    
     def save(self, commit=True):
         user = super().save(commit=False)
         user.email = self.cleaned_data['email']
@@ -16,13 +22,49 @@ class UserRegistrationForm(UserCreationForm):
             user.save()
         return user
 
+class OrganizationCreationForm(forms.ModelForm):
+    class Meta:
+        model = Organization
+        fields = ['name', 'description', 'logo']
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Nombre de tu organización/empresa'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control', 
+                'rows': 3, 
+                'placeholder': 'Describe tu organización (opcional)'
+            }),
+            'logo': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*'
+            }),
+        }
+
 class DynamicFormCreationForm(forms.ModelForm):
     class Meta:
         model = DynamicForm
-        fields = ['title', 'description']
+        fields = ['title', 'description', 'is_public']
         widgets = {
-            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Título del formulario'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Descripción opcional'}),
+            'title': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Título del formulario'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control', 
+                'rows': 3, 
+                'placeholder': 'Descripción opcional'
+            }),
+            'is_public': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
+        }
+        labels = {
+            'is_public': '¿Formulario público?',
+        }
+        help_texts = {
+            'is_public': 'Si está marcado, cualquier persona puede llenar este formulario.',
         }
 
 class DynamicFormFieldForm(forms.ModelForm):
@@ -47,3 +89,115 @@ class DynamicFormFieldForm(forms.ModelForm):
         for field_type in FieldType.objects.all():
             field_type_choices.append((field_type.id, f"{field_type.display_name} ({field_type.cost} monedas)"))
         self.fields['field_type'].choices = field_type_choices
+
+class UserInvitationForm(forms.Form):
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'email@ejemplo.com'
+        }),
+        label='Email del usuario'
+    )
+    role = forms.ChoiceField(
+        choices=[
+            ('admin', 'Administrador'),
+            ('editor', 'Editor'),
+            ('viewer', 'Visualizador'),
+            ('form_filler', 'Llenador de Formularios'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label='Rol'
+    )
+    
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        try:
+            user = CustomUser.objects.get(email=email)
+            return email
+        except CustomUser.DoesNotExist:
+            raise forms.ValidationError('No existe un usuario con este email. El usuario debe registrarse primero.')
+
+class BulkUserInviteForm(forms.Form):
+    emails = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 5,
+            'placeholder': 'email1@ejemplo.com\nemail2@ejemplo.com\nemail3@ejemplo.com'
+        }),
+        label='Emails (uno por línea)',
+        help_text='Ingresa un email por línea'
+    )
+    role = forms.ChoiceField(
+        choices=[
+            ('admin', 'Administrador'),
+            ('editor', 'Editor'),
+            ('viewer', 'Visualizador'),
+            ('form_filler', 'Llenador de Formularios'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label='Rol para todos los usuarios'
+    )
+    
+    def clean_emails(self):
+        emails_text = self.cleaned_data['emails']
+        emails = [email.strip() for email in emails_text.split('\n') if email.strip()]
+        
+        if not emails:
+            raise forms.ValidationError('Debes ingresar al menos un email.')
+        
+        # Validar que todos sean emails válidos
+        from django.core.validators import validate_email
+        from django.core.exceptions import ValidationError
+        
+        valid_emails = []
+        for email in emails:
+            try:
+                validate_email(email)
+                valid_emails.append(email)
+            except ValidationError:
+                raise forms.ValidationError(f'Email inválido: {email}')
+        
+        return valid_emails
+
+
+class BulkUserInviteForm(forms.Form):
+    users_data = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 5,
+            'placeholder': 'email1@example.com,editor\nemail2@example.com,viewer\nemail3@example.com,admin'
+        }),
+        label='Datos de Usuarios',
+        help_text='Formato: email,rol (uno por línea o separados por ;). Roles válidos: admin, editor, viewer'
+    )
+    
+    def clean_users_data(self):
+        data = self.cleaned_data['users_data']
+        
+        if not data.strip():
+            raise forms.ValidationError('Debes ingresar datos de usuarios.')
+        
+        # Validar formato
+        lines = [line.strip() for line in data.replace(';', '\n').split('\n') if line.strip()]
+        
+        from django.core.validators import validate_email
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        
+        valid_roles = ['admin', 'editor', 'viewer']
+        
+        for line in lines:
+            parts = line.split(',')
+            if len(parts) != 2:
+                raise forms.ValidationError(f'Formato inválido en línea: {line}. Usa: email,rol')
+            
+            email, role = parts[0].strip(), parts[1].strip()
+            
+            try:
+                validate_email(email)
+            except DjangoValidationError:
+                raise forms.ValidationError(f'Email inválido: {email}')
+            
+            if role not in valid_roles:
+                raise forms.ValidationError(f'Rol inválido: {role}. Usa: {", ".join(valid_roles)}')
+        
+        return data

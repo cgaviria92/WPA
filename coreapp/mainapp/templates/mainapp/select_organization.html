@@ -1,0 +1,99 @@
+{% extends 'mainapp/base.html' %}
+
+{% block title %}Seleccionar Organización - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="text-center mb-5">
+            <h1><i class="fas fa-building"></i> ¡Bienvenido, {{ user.username }}!</h1>
+            <p class="lead">Selecciona una organización para continuar o crea una nueva</p>
+        </div>
+
+        {% if user_memberships.exists %}
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h3><i class="fas fa-users"></i> Tus Organizaciones</h3>
+                    <div class="row">
+                        {% for membership in user_memberships %}
+                            <div class="col-md-6 col-lg-4 mb-4">
+                                <div class="card h-100 border-primary">
+                                    <div class="card-body">
+                                        {% if membership.organization.logo %}
+                                            <img src="{{ membership.organization.logo.url }}" class="img-fluid mb-3" style="max-height: 60px;">
+                                        {% else %}
+                                            <i class="fas fa-building fa-3x text-primary mb-3"></i>
+                                        {% endif %}
+                                        <h5 class="card-title">{{ membership.organization.name }}</h5>
+                                        <p class="card-text">{{ membership.organization.description|truncatewords:15 }}</p>
+                                        <div class="mb-3">
+                                            <span class="badge bg-{% if membership.role == 'owner' %}warning{% elif membership.role == 'admin' %}primary{% elif membership.role == 'editor' %}success{% else %}secondary{% endif %}">
+                                                {{ membership.get_role_display }}
+                                            </span>
+                                        </div>
+                                        <div class="row text-center small text-muted mb-3">
+                                            <div class="col-4">
+                                                <strong>{{ membership.organization.forms.count }}</strong><br>
+                                                Formularios
+                                            </div>
+                                            <div class="col-4">
+                                                <strong>{{ membership.organization.memberships.count }}</strong><br>
+                                                Miembros
+                                            </div>
+                                            <div class="col-4">
+                                                <strong>{{ membership.organization.activity_logs.count }}</strong><br>
+                                                Actividades
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-footer">
+                                        {% if membership.organization.slug %}
+                                            <a href="{% url 'dashboard' membership.organization.slug %}" class="btn btn-primary w-100">
+                                                <i class="fas fa-arrow-right"></i> Ingresar
+                                            </a>
+                                        {% else %}
+                                            <button class="btn btn-secondary w-100" disabled>
+                                                <i class="fas fa-exclamation-triangle"></i> Organización sin configurar
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card bg-light border-0">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-plus-circle fa-4x text-primary mb-4"></i>
+                        <h4>Crear Nueva Organización</h4>
+                        <p class="text-muted mb-4">
+                            ¿Primera vez aquí o necesitas crear una nueva empresa/organización?<br>
+                            ¡Es gratis y solo toma unos minutos!
+                        </p>
+                        <a href="{% url 'create_organization' %}" class="btn btn-success btn-lg">
+                            <i class="fas fa-plus"></i> Crear Mi Organización
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if not user_memberships.exists %}
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="alert alert-info text-center">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>¡Comienza aquí!</strong><br>
+                        Como nuevo usuario, necesitas crear una organización o ser invitado a una existente.
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
