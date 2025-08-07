@@ -55,7 +55,7 @@
             <div class="alert alert-info">
                 <i class="fas fa-info-circle"></i> No hay formularios públicos disponibles aún.
                 {% if user.is_authenticated %}
-                    <a href="{% url 'create_form' %}">¡Crea el primero!</a>
+                    <a href="{% url 'select_organization' %}">¡Crea el primero!</a>
                 {% else %}
                     <a href="{% url 'register' %}">¡Regístrate para crear uno!</a>
                 {% endif %}
