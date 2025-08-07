@@ -7,9 +7,11 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils.text import slugify
 from django.db import transaction
+from django.db import models
 from .models import (
     CustomUser, Organization, OrganizationMembership, FieldType, 
-    DynamicForm, DynamicFormField, FormSubmission, CoinTransaction, ActivityLog
+    DynamicForm, DynamicFormField, FormSubmission, CoinTransaction, ActivityLog,
+    FormTemplate, InventoryItem, InventoryTransaction, BusinessLogicProcessor
 )
 from .forms import (
     DynamicFormCreationForm, DynamicFormFieldForm, UserRegistrationForm,
@@ -850,3 +852,236 @@ def clear_old_logs(request, org_slug):
     )
     
     return JsonResponse({'success': True, 'deleted_count': deleted_count})
+
+
+@login_required
+def form_templates(request, org_slug):
+    """Ver plantillas de formularios disponibles"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_edit_forms():
+            messages.error(request, 'No tienes permisos para crear formularios.')
+            return redirect('dashboard', org_slug=org_slug)
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
+    templates = FormTemplate.objects.filter(is_active=True).order_by('category', 'name')
+    categories = FormTemplate.CATEGORY_CHOICES
+    
+    context = {
+        'organization': organization,
+        'membership': membership,
+        'templates': templates,
+        'categories': categories,
+    }
+    return render(request, 'mainapp/form_templates.html', context)
+
+
+@login_required
+def create_form_from_template(request, org_slug, template_id):
+    """Crear un formulario basado en una plantilla"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    template = get_object_or_404(FormTemplate, id=template_id, is_active=True)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_edit_forms():
+            messages.error(request, 'No tienes permisos para crear formularios.')
+            return redirect('dashboard', org_slug=org_slug)
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
+    if request.method == 'POST':
+        with transaction.atomic():
+            # Crear formulario basado en la plantilla
+            template_data = template.template_data
+            
+            # Crear el formulario
+            form = DynamicForm.objects.create(
+                organization=organization,
+                creator=request.user,
+                title=template_data.get('title', template.name),
+                description=template.description,
+                submissions_label=template_data.get('submissions_label', 'Respuestas'),
+                is_public=template_data.get('is_public', False)
+            )
+            
+            # Crear campos
+            total_cost = 0
+            for i, field_data in enumerate(template_data.get('fields', [])):
+                # Buscar tipo de campo
+                try:
+                    field_type = FieldType.objects.get(name=field_data['field_type'])
+                    
+                    # Verificar si el usuario tiene suficientes monedas
+                    if request.user.monedas < field_type.cost:
+                        messages.error(request, f'No tienes suficientes monedas para agregar el campo "{field_data["label"]}"')
+                        continue
+                    
+                    # Crear campo
+                    DynamicFormField.objects.create(
+                        form=form,
+                        field_type=field_type,
+                        label=field_data['label'],
+                        help_text=field_data.get('help_text', ''),
+                        is_required=field_data.get('is_required', False),
+                        choices=field_data.get('choices', ''),
+                        order=i
+                    )
+                    
+                    # Descontar monedas
+                    request.user.monedas -= field_type.cost
+                    total_cost += field_type.cost
+                    
+                    # Registrar transacción
+                    CoinTransaction.objects.create(
+                        user=request.user,
+                        organization=organization,
+                        transaction_type='spend',
+                        amount=field_type.cost,
+                        description=f'Campo agregado: {field_data["label"]} ({field_type.display_name})',
+                        related_form=form
+                    )
+                    
+                except FieldType.DoesNotExist:
+                    messages.warning(request, f'Tipo de campo "{field_data["field_type"]}" no encontrado')
+                    continue
+            
+            # Actualizar costo total y guardar usuario
+            form.total_cost = total_cost
+            form.save()
+            request.user.save()
+            
+            # Crear lógica de negocio si está definida
+            if template.business_logic:
+                BusinessLogicProcessor.objects.create(
+                    form=form,
+                    logic_type=template.category,
+                    python_code=template.business_logic,
+                    config_data={'template_id': template.id}
+                )
+            
+            # Incrementar contador de uso de plantilla
+            template.usage_count += 1
+            template.save()
+            
+            # Log de actividad
+            log_activity(
+                user=request.user,
+                action='create_form',
+                description=f'Formulario creado desde plantilla: {template.name}',
+                organization=organization,
+                form=form,
+                request=request
+            )
+            
+            messages.success(request, f'¡Formulario "{form.title}" creado exitosamente desde la plantilla!')
+            return redirect('edit_form', org_slug=org_slug, form_id=form.id)
+    
+    context = {
+        'organization': organization,
+        'membership': membership,
+        'template': template,
+    }
+    return render(request, 'mainapp/create_form_from_template.html', context)
+
+
+@login_required
+def inventory_dashboard(request, org_slug):
+    """Dashboard de inventario para la organización"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
+    # Estadísticas de inventario
+    items = InventoryItem.objects.filter(organization=organization, is_active=True)
+    transactions = InventoryTransaction.objects.filter(organization=organization)
+    
+    stats = {
+        'total_items': items.count(),
+        'low_stock_items': items.filter(current_stock__lte=models.F('min_stock')).count(),
+        'total_transactions': transactions.count(),
+        'total_value': sum(item.current_stock * item.purchase_price for item in items),
+    }
+    
+    # Artículos con stock bajo
+    low_stock_items = items.filter(current_stock__lte=models.F('min_stock'))[:5]
+    
+    # Transacciones recientes
+    recent_transactions = transactions.order_by('-created_at')[:10]
+    
+    context = {
+        'organization': organization,
+        'membership': membership,
+        'stats': stats,
+        'low_stock_items': low_stock_items,
+        'recent_transactions': recent_transactions,
+    }
+    return render(request, 'mainapp/inventory_dashboard.html', context)
+
+
+@login_required
+def inventory_items(request, org_slug):
+    """Listado de artículos de inventario"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
+    items = InventoryItem.objects.filter(organization=organization, is_active=True).order_by('name')
+    
+    context = {
+        'organization': organization,
+        'membership': membership,
+        'items': items,
+    }
+    return render(request, 'mainapp/inventory_items.html', context)
+
+
+@login_required
+def inventory_transactions(request, org_slug):
+    """Historial de transacciones de inventario"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar permisos
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('select_organization')
+    
+    transactions = InventoryTransaction.objects.filter(
+        organization=organization
+    ).order_by('-created_at')
+    
+    context = {
+        'organization': organization,
+        'membership': membership,
+        'transactions': transactions,
+    }
+    return render(request, 'mainapp/inventory_transactions.html', context)

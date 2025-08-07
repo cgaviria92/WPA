@@ -29,7 +29,7 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'index' %}">
+            <a class="navbar-brand" href="{% url 'mainapp:index' %}">
                 <i class="fas fa-magic"></i> FormBuilder Pro
             </a>
             <div class="navbar-nav ms-auto">
@@ -40,11 +40,11 @@
                     {% if user.is_admin_user %}
                         <span class="badge bg-warning text-dark me-2">ADMIN</span>
                     {% endif %}
-                    <a class="nav-link" href="{% url 'select_organization' %}">Mis Organizaciones</a>
+                    <a class="nav-link" href="{% url 'mainapp:select_organization' %}">Mis Organizaciones</a>
                     <a class="nav-link" href="{% url 'logout' %}">Cerrar Sesión</a>
                 {% else %}
                     <a class="nav-link" href="{% url 'login' %}">Iniciar Sesión</a>
-                    <a class="nav-link" href="{% url 'register' %}">Registrarse</a>
+                    <a class="nav-link" href="{% url 'mainapp:register' %}">Registrarse</a>
                 {% endif %}
             </div>
         </div>

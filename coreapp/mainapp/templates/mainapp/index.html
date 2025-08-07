@@ -10,7 +10,7 @@
             <p class="lead">Plataforma dinámica y ajustable a lo que necesitas. Crea formularios sin código, gestiona tus recursos con un sistema de monedas inteligente.</p>
             {% if not user.is_authenticated %}
                 <div class="mt-4">
-                    <a class="btn btn-warning btn-lg me-3" href="{% url 'register' %}">
+                    <a class="btn btn-warning btn-lg me-3" href="{% url 'mainapp:register' %}">
                         <i class="fas fa-user-plus"></i> ¡Regístrate Gratis!
                     </a>
                     <a class="btn btn-outline-light btn-lg" href="{% url 'login' %}">
@@ -21,7 +21,7 @@
                     <small class="text-light"><i class="fas fa-crown"></i> ¡El primer usuario se convierte en administrador con 1000 monedas!</small>
                 </div>
             {% else %}
-                <a class="btn btn-warning btn-lg" href="{% url 'select_organization' %}">
+                <a class="btn btn-warning btn-lg" href="{% url 'mainapp:select_organization' %}">
                     <i class="fas fa-building"></i> Mis Organizaciones
                 </a>
             {% endif %}
@@ -117,11 +117,11 @@
                         {% endif %}
                     </p>
                     {% if user.is_authenticated %}
-                        <a href="{% url 'select_organization' %}" class="btn btn-primary">
+                        <a href="{% url 'mainapp:select_organization' %}" class="btn btn-primary">
                             <i class="fas fa-plus"></i> Crear Primer Formulario
                         </a>
                     {% else %}
-                        <a href="{% url 'register' %}" class="btn btn-warning">
+                        <a href="{% url 'mainapp:register' %}" class="btn btn-warning">
                             <i class="fas fa-user-plus"></i> ¡Empezar Ahora!
                         </a>
                     {% endif %}

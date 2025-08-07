@@ -9,11 +9,11 @@
             <h1 class="display-4">¡Bienvenido a FormBuilder Pro!</h1>
             <p class="lead">Crea formularios dinámicos sin código. El primer usuario registrado se convierte en administrador.</p>
             {% if not user.is_authenticated %}
-                <a class="btn btn-warning btn-lg" href="{% url 'register' %}">
+                <a class="btn btn-warning btn-lg" href="{% url 'mainapp:register' %}">
                     <i class="fas fa-user-plus"></i> ¡Regístrate Ahora!
                 </a>
             {% else %}
-                <a class="btn btn-warning btn-lg" href="{% url 'select_organization' %}">
+                <a class="btn btn-warning btn-lg" href="{% url 'mainapp:select_organization' %}">
                     <i class="fas fa-building"></i> Mis Organizaciones
                 </a>
             {% endif %}
@@ -55,9 +55,9 @@
             <div class="alert alert-info">
                 <i class="fas fa-info-circle"></i> No hay formularios públicos disponibles aún.
                 {% if user.is_authenticated %}
-                    <a href="{% url 'select_organization' %}">¡Crea el primero!</a>
+                    <a href="{% url 'mainapp:select_organization' %}">¡Crea el primero!</a>
                 {% else %}
-                    <a href="{% url 'register' %}">¡Regístrate para crear uno!</a>
+                    <a href="{% url 'mainapp:register' %}">¡Regístrate para crear uno!</a>
                 {% endif %}
             </div>
         {% endif %}

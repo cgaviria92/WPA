@@ -1,6 +1,8 @@
 from django.urls import path
 from . import views
 
+app_name = 'mainapp'
+
 urlpatterns = [
     # Páginas públicas
     path('', views.index, name='index'),
@@ -14,11 +16,18 @@ urlpatterns = [
     # URLs específicas por organización
     path('org/<slug:org_slug>/', views.dashboard, name='dashboard'),
     path('org/<slug:org_slug>/forms/create/', views.create_form, name='create_form'),
+    path('org/<slug:org_slug>/forms/create/from-template/<int:template_id>/', views.create_form_from_template, name='create_form_from_template'),
+    path('org/<slug:org_slug>/forms/templates/', views.form_templates, name='form_templates'),
     path('org/<slug:org_slug>/forms/<int:form_id>/edit/', views.edit_form, name='edit_form'),
     path('org/<slug:org_slug>/forms/<int:form_id>/view/', views.view_form, name='view_form'),
     path('org/<slug:org_slug>/forms/<int:form_id>/submissions/', views.form_submissions, name='form_submissions'),
     path('org/<slug:org_slug>/forms/<int:form_id>/add-field/', views.add_field_to_form, name='add_field_to_form'),
     path('org/<slug:org_slug>/fields/<int:field_id>/delete/', views.delete_field, name='delete_field'),
+    
+    # Inventario y lógica de negocio
+    path('org/<slug:org_slug>/inventory/', views.inventory_dashboard, name='inventory_dashboard'),
+    path('org/<slug:org_slug>/inventory/items/', views.inventory_items, name='inventory_items'),
+    path('org/<slug:org_slug>/inventory/transactions/', views.inventory_transactions, name='inventory_transactions'),
     
     # Gestión de equipo y logs
     path('org/<slug:org_slug>/team/', views.team_management, name='team_management'),

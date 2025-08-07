@@ -1,0 +1,354 @@
+{% extends "mainapp/base.html" %}
+{% load static %}
+
+{% block title %}Crear Formulario desde Plantilla - {{ organization.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="h3 mb-1">
+                        <i class="fas fa-plus-circle text-primary me-2"></i>
+                        Crear desde Plantilla: {{ template.name }}
+                    </h2>
+                    <p class="text-muted">{{ template.description }}</p>
+                </div>
+                <div>
+                    <a href="{% url 'mainapp:form_templates' org_slug=organization.slug %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Volver a Plantillas
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información de la plantilla -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <div class="template-icon-large">
+                                <i class="{{ template.icon }} fa-3x text-primary"></i>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <h5 class="mb-1">{{ template.name }}</h5>
+                            <span class="badge bg-{{ template.category }}-subtle text-{{ template.category }} mb-2">
+                                {{ template.get_category_display }}
+                            </span>
+                            <p class="text-muted mb-0">{{ template.description }}</p>
+                        </div>
+                        <div class="col-auto">
+                            <div class="text-center">
+                                <div class="h4 mb-0 text-primary">{{ template.template_data.fields|length }}</div>
+                                <small class="text-muted">campos incluidos</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulario de creación -->
+    <form method="post" id="createFormFromTemplate">
+        {% csrf_token %}
+        
+        <div class="row">
+            <!-- Configuración básica -->
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white border-0 pb-0">
+                        <h6 class="mb-0">
+                            <i class="fas fa-cog me-2"></i>
+                            Configuración del Formulario
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="form_title" class="form-label">Título del Formulario *</label>
+                                <input type="text" class="form-control" id="form_title" name="title" 
+                                       value="{{ template.name }}" required>
+                                <div class="form-text">Puedes personalizar el título del formulario</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="form_public" class="form-label">Acceso Público</label>
+                                <select class="form-select" id="form_public" name="is_public">
+                                    <option value="0">Solo usuarios registrados</option>
+                                    <option value="1">Acceso público (cualquier persona)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="form_description" class="form-label">Descripción</label>
+                            <textarea class="form-control" id="form_description" name="description" rows="3">{{ template.description }}</textarea>
+                            <div class="form-text">Describe el propósito de este formulario</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vista previa de campos -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-0 pb-0">
+                        <h6 class="mb-0">
+                            <i class="fas fa-list me-2"></i>
+                            Campos que se Crearán ({{ template.template_data.fields|length }})
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Campo</th>
+                                        <th>Tipo</th>
+                                        <th>Requerido</th>
+                                        <th>Configuración</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for field in template.template_data.fields %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>
+                                            <strong>{{ field.label }}</strong>
+                                            {% if field.help_text %}
+                                            <br><small class="text-muted">{{ field.help_text }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info-subtle text-info">
+                                                {{ field.field_type|title }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% if field.is_required %}
+                                                <span class="badge bg-warning-subtle text-warning">
+                                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                                    Requerido
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">Opcional</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if field.choices %}
+                                                <small class="text-muted">
+                                                    <i class="fas fa-list me-1"></i>
+                                                    {{ field.choices|length }} opciones
+                                                </small>
+                                            {% elif field.max_length %}
+                                                <small class="text-muted">
+                                                    <i class="fas fa-ruler me-1"></i>
+                                                    Máx: {{ field.max_length }}
+                                                </small>
+                                            {% elif field.min_value or field.max_value %}
+                                                <small class="text-muted">
+                                                    <i class="fas fa-hashtag me-1"></i>
+                                                    {% if field.min_value %}Min: {{ field.min_value }}{% endif %}
+                                                    {% if field.max_value %}Max: {{ field.max_value }}{% endif %}
+                                                </small>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel lateral -->
+            <div class="col-lg-4">
+                <!-- Resumen de costos -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-coins me-2"></i>
+                            Costo del Formulario
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span>Total de campos:</span>
+                            <span class="badge bg-secondary">{{ template.template_data.fields|length }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span>Costo estimado:</span>
+                            <span class="h5 text-primary mb-0" id="estimated-cost">
+                                <i class="fas fa-coins me-1"></i>
+                                Calculando...
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Tu saldo actual:</span>
+                            <span class="fw-bold text-success">
+                                <i class="fas fa-coins me-1"></i>
+                                {{ user.monedas }}
+                            </span>
+                        </div>
+                        <hr>
+                        <div class="text-center">
+                            <small class="text-muted">
+                                Los costos se deducirán cuando crees el formulario
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lógica de negocio -->
+                {% if template.business_logic %}
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-cogs me-2"></i>
+                            Lógica de Negocio
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Esta plantilla incluye lógica de negocio automática que se aplicará a los datos enviados.
+                        </div>
+                        <div class="mt-3">
+                            <small class="text-muted">{{ template.business_logic|truncatewords:20 }}</small>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Botones de acción -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <button type="submit" class="btn btn-primary btn-lg w-100 mb-2" id="createBtn">
+                            <i class="fas fa-plus me-2"></i>
+                            Crear Formulario
+                        </button>
+                        <a href="{% url 'mainapp:form_templates' org_slug=organization.slug %}" 
+                           class="btn btn-outline-secondary w-100">
+                            <i class="fas fa-times me-1"></i>
+                            Cancelar
+                        </a>
+                        
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-clock me-1"></i>
+                                Tiempo estimado: 30 segundos
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .template-icon-large {
+        width: 80px;
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(var(--bs-primary-rgb), 0.1);
+        border-radius: 16px;
+    }
+
+    .table th {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #6c757d;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .table td {
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f3f4;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(var(--bs-primary-rgb), 0.04);
+    }
+
+    .badge.bg-inventory-subtle { background-color: rgba(255, 193, 7, 0.1) !important; color: #856404 !important; }
+    .badge.bg-sales-subtle { background-color: rgba(25, 135, 84, 0.1) !important; color: #0f5132 !important; }
+    .badge.bg-hr-subtle { background-color: rgba(13, 110, 253, 0.1) !important; color: #084298 !important; }
+    .badge.bg-customer-subtle { background-color: rgba(220, 53, 69, 0.1) !important; color: #842029 !important; }
+    .badge.bg-finance-subtle { background-color: rgba(102, 16, 242, 0.1) !important; color: #59267c !important; }
+    .badge.bg-general-subtle { background-color: rgba(108, 117, 125, 0.1) !important; color: #495057 !important; }
+
+    .btn-lg {
+        padding: 0.75rem 1.5rem;
+        font-size: 1.1rem;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Calcular costo estimado
+        calculateEstimatedCost();
+        
+        // Validar formulario
+        const form = document.getElementById('createFormFromTemplate');
+        const createBtn = document.getElementById('createBtn');
+        
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Deshabilitar botón y mostrar loading
+            createBtn.disabled = true;
+            createBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creando...';
+            
+            // Simular delay y enviar
+            setTimeout(() => {
+                form.submit();
+            }, 1000);
+        });
+    });
+
+    function calculateEstimatedCost() {
+        // Simular cálculo de costo basado en tipos de campo
+        const fieldTypes = {{ template.template_data.fields|length }};
+        const baseCost = 50; // Costo base por campo
+        const estimatedCost = fieldTypes * baseCost;
+        
+        document.getElementById('estimated-cost').innerHTML = 
+            '<i class="fas fa-coins me-1"></i>' + estimatedCost;
+        
+        // Verificar si el usuario tiene suficientes monedas
+        const userCoins = {{ user.monedas }};
+        const createBtn = document.getElementById('createBtn');
+        
+        if (userCoins < estimatedCost) {
+            createBtn.disabled = true;
+            createBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Monedas Insuficientes';
+            createBtn.classList.remove('btn-primary');
+            createBtn.classList.add('btn-danger');
+            
+            // Mostrar alerta
+            const costCard = createBtn.closest('.card-body');
+            costCard.insertAdjacentHTML('beforeend', `
+                <div class="alert alert-danger mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    No tienes suficientes monedas. Necesitas ${estimatedCost - userCoins} monedas más.
+                </div>
+            `);
+        }
+    }
+</script>
+{% endblock %}

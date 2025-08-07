@@ -225,3 +225,164 @@ class ActivityLog(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.get_action_display()} - {self.created_at}"
+
+
+class FormTemplate(models.Model):
+    """Plantillas predefinidas de formularios para diferentes casos de uso"""
+    CATEGORY_CHOICES = [
+        ('inventory', 'Inventario'),
+        ('sales', 'Ventas'),
+        ('hr', 'Recursos Humanos'),
+        ('customer', 'Atención al Cliente'),
+        ('finance', 'Finanzas'),
+        ('general', 'General'),
+    ]
+    
+    name = models.CharField(max_length=200, verbose_name="Nombre de la Plantilla")
+    description = models.TextField(verbose_name="Descripción")
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, verbose_name="Categoría")
+    icon = models.CharField(max_length=50, default="fas fa-file-alt", verbose_name="Icono Font Awesome")
+    
+    # Configuración de la plantilla
+    template_data = models.JSONField(verbose_name="Datos de la plantilla")
+    business_logic = models.TextField(blank=True, verbose_name="Lógica de negocio (Python)")
+    
+    # Metadatos
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    usage_count = models.IntegerField(default=0)
+    
+    class Meta:
+        ordering = ['category', 'name']
+        verbose_name = "Plantilla de Formulario"
+        verbose_name_plural = "Plantillas de Formularios"
+    
+    def __str__(self):
+        return f"{self.get_category_display()} - {self.name}"
+
+
+class InventoryItem(models.Model):
+    """Artículos de inventario para lógica de negocio"""
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='inventory_items')
+    name = models.CharField(max_length=200, verbose_name="Nombre del artículo")
+    description = models.TextField(blank=True, verbose_name="Descripción")
+    sku = models.CharField(max_length=100, verbose_name="SKU/Código")
+    
+    # Stock y precios
+    current_stock = models.IntegerField(default=0, verbose_name="Stock actual")
+    min_stock = models.IntegerField(default=5, verbose_name="Stock mínimo")
+    purchase_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio de compra")
+    sale_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio de venta")
+    
+    # Metadatos
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['organization', 'sku']
+        ordering = ['name']
+        verbose_name = "Artículo de Inventario"
+        verbose_name_plural = "Artículos de Inventario"
+    
+    def __str__(self):
+        return f"{self.name} ({self.sku}) - Stock: {self.current_stock}"
+    
+    @property
+    def profit_margin(self):
+        """Calcular margen de ganancia"""
+        if self.purchase_price > 0:
+            return ((self.sale_price - self.purchase_price) / self.purchase_price) * 100
+        return 0
+    
+    @property
+    def needs_restock(self):
+        """Verificar si necesita reabastecimiento"""
+        return self.current_stock <= self.min_stock
+
+
+class InventoryTransaction(models.Model):
+    """Transacciones de inventario (compras, ventas, ajustes)"""
+    TRANSACTION_TYPES = [
+        ('purchase', 'Compra'),
+        ('sale', 'Venta'),
+        ('adjustment', 'Ajuste'),
+        ('return', 'Devolución'),
+    ]
+    
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='inventory_transactions')
+    item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='transactions')
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
+    
+    # Detalles de la transacción
+    quantity = models.IntegerField(verbose_name="Cantidad")
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio unitario")
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Total")
+    
+    # Referencias
+    reference_number = models.CharField(max_length=100, blank=True, verbose_name="Número de referencia")
+    notes = models.TextField(blank=True, verbose_name="Notas")
+    
+    # Relacionado con formularios
+    related_form_submission = models.ForeignKey(FormSubmission, on_delete=models.SET_NULL, 
+                                              null=True, blank=True, verbose_name="Envío de formulario relacionado")
+    
+    # Metadatos
+    created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Transacción de Inventario"
+        verbose_name_plural = "Transacciones de Inventario"
+    
+    def __str__(self):
+        return f"{self.get_transaction_type_display()} - {self.item.name} x{self.quantity}"
+    
+    def save(self, *args, **kwargs):
+        """Actualizar stock automáticamente"""
+        # Calcular total
+        self.total_amount = self.quantity * self.unit_price
+        
+        # Guardar transacción
+        super().save(*args, **kwargs)
+        
+        # Actualizar stock del artículo
+        if self.transaction_type in ['purchase', 'return']:
+            self.item.current_stock += self.quantity
+        elif self.transaction_type in ['sale']:
+            self.item.current_stock -= self.quantity
+        elif self.transaction_type == 'adjustment':
+            # Para ajustes, la cantidad puede ser positiva o negativa
+            self.item.current_stock = self.quantity
+        
+        self.item.save()
+
+
+class BusinessLogicProcessor(models.Model):
+    """Procesador de lógica de negocio para formularios"""
+    form = models.OneToOneField(DynamicForm, on_delete=models.CASCADE, related_name='business_logic')
+    logic_type = models.CharField(max_length=50, choices=[
+        ('inventory', 'Gestión de Inventario'),
+        ('sales', 'Procesamiento de Ventas'),
+        ('calculations', 'Cálculos Automáticos'),
+        ('notifications', 'Notificaciones'),
+        ('custom', 'Lógica Personalizada'),
+    ])
+    
+    # Configuración de la lógica
+    config_data = models.JSONField(default=dict, verbose_name="Configuración")
+    python_code = models.TextField(blank=True, verbose_name="Código Python personalizado")
+    
+    # Estado
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Lógica de Negocio"
+        verbose_name_plural = "Lógicas de Negocio"
+    
+    def __str__(self):
+        return f"{self.form.title} - {self.get_logic_type_display()}"
