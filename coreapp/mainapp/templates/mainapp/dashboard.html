@@ -113,7 +113,7 @@
                                     <th>Título</th>
                                     <th>Costo</th>
                                     <th>Respuestas</th>
-                                    <th>Público</th>
+                                    <th>Acceso</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
@@ -128,9 +128,9 @@
                                     <td>{{ form.submissions.count }}</td>
                                     <td>
                                         {% if form.is_public %}
-                                            <span class="badge bg-success">Público</span>
+                                            <span class="badge bg-success"><i class="fas fa-globe"></i> Público</span>
                                         {% else %}
-                                            <span class="badge bg-secondary">Privado</span>
+                                            <span class="badge bg-primary"><i class="fas fa-lock"></i> Solo Miembros</span>
                                         {% endif %}
                                     </td>
                                     <td>

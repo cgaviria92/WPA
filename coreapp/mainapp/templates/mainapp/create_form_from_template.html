@@ -79,11 +79,12 @@
                                 <div class="form-text">Puedes personalizar el título del formulario</div>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="form_public" class="form-label">Acceso Público</label>
+                                <label for="form_public" class="form-label">Tipo de Acceso</label>
                                 <select class="form-select" id="form_public" name="is_public">
-                                    <option value="0">Solo usuarios registrados</option>
-                                    <option value="1">Acceso público (cualquier persona)</option>
+                                    <option value="0" selected>Solo usuarios registrados en la organización</option>
+                                    <option value="1">Acceso público (cualquier persona con el enlace)</option>
                                 </select>
+                                <small class="text-muted">Por defecto, solo los miembros de tu organización pueden acceder al formulario.</small>
                             </div>
                         </div>
                         <div class="mb-3">

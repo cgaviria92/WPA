@@ -61,10 +61,10 @@ class DynamicFormCreationForm(forms.ModelForm):
             }),
         }
         labels = {
-            'is_public': '¿Formulario público?',
+            'is_public': 'Permitir acceso público',
         }
         help_texts = {
-            'is_public': 'Si está marcado, cualquier persona puede llenar este formulario.',
+            'is_public': 'Si está marcado, cualquier persona con el enlace puede llenar este formulario (no requiere registro).',
         }
 
 class DynamicFormFieldForm(forms.ModelForm):
