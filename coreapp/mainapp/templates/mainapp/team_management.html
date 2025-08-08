@@ -284,7 +284,7 @@ function changeRole(membershipId, newRole) {
 
 function removeMember(membershipId) {
     if (confirm('¿Estás seguro de que quieres remover a este usuario de la organización?')) {
-        fetch(`{% url 'remove_member' organization.slug 0 %}`.replace('0', membershipId), {
+        fetch(`{% url 'mainapp:remove_member' organization.slug 0 %}`.replace('0', membershipId), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
