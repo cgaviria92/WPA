@@ -1,9 +1,11 @@
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from mainapp.models import FormTemplate
 
 class Command(BaseCommand):
     help = 'Crear plantillas predefinidas de formularios'
 
+    @transaction.atomic
     def handle(self, *args, **options):
         templates = [
             {
@@ -329,21 +331,30 @@ def process_sale(submission_data):
         ]
 
         created_count = 0
-        for template_data in templates:
-            template, created = FormTemplate.objects.get_or_create(
-                name=template_data['name'],
-                defaults=template_data
-            )
-            if created:
-                created_count += 1
-                self.stdout.write(
-                    self.style.SUCCESS(f'✓ Creada plantilla: {template.name}')
+        try:
+            for template_data in templates:
+                template, created = FormTemplate.objects.get_or_create(
+                    name=template_data['name'],
+                    defaults=template_data
                 )
-            else:
-                self.stdout.write(
-                    self.style.WARNING(f'- Plantilla ya existe: {template.name}')
-                )
+                if created:
+                    created_count += 1
+                    self.stdout.write(
+                        self.style.SUCCESS(f'✓ Creada plantilla: {template.name}')
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.WARNING(f'- Plantilla ya existe: {template.name}')
+                    )
 
-        self.stdout.write(
-            self.style.SUCCESS(f'\n🎉 Proceso completado! {created_count} plantillas nuevas creadas.')
-        )
+            self.stdout.write(
+                self.style.SUCCESS(f'\n🎉 Proceso completado! {created_count} plantillas nuevas creadas.')
+            )
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f'\n❌ Error al crear plantillas: {str(e)}')
+            )
+            self.stdout.write(
+                self.style.WARNING('Se ha hecho rollback de todas las operaciones.')
+            )
+            raise  # Re-lanzar la excepción para que @transaction.atomic haga rollback

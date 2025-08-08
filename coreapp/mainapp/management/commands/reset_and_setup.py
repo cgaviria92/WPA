@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.core.management import call_command
 from django.contrib.auth import get_user_model
-from django.db import connection
+from django.db import connection, transaction
 import os
 import sys
 
@@ -59,16 +59,17 @@ class Command(BaseCommand):
 
             # 3. Crear superusuario
             self.stdout.write('\n👤 Paso 3: Creando superusuario...')
-            if not User.objects.filter(username='admin').exists():
-                User.objects.create_superuser(
-                    username='admin',
-                    email='admin@example.com',
-                    password='admin123',
-                    monedas=10000
-                )
-                self.stdout.write(self.style.SUCCESS('   ✓ Superusuario creado (admin/admin123)'))
-            else:
-                self.stdout.write(self.style.WARNING('   ⚠️  Superusuario ya existe'))
+            with transaction.atomic():
+                if not User.objects.filter(username='admin').exists():
+                    User.objects.create_superuser(
+                        username='admin',
+                        email='admin@example.com',
+                        password='admin123',
+                        monedas=10000
+                    )
+                    self.stdout.write(self.style.SUCCESS('   ✓ Superusuario creado (admin/admin123)'))
+                else:
+                    self.stdout.write(self.style.WARNING('   ⚠️  Superusuario ya existe'))
 
             # 4. Poblar tipos de campo
             self.stdout.write('\n📝 Paso 4: Configurando tipos de campo...')

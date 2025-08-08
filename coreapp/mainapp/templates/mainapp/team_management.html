@@ -25,7 +25,7 @@
                 <h5><i class="fas fa-user-plus"></i> Invitar Usuario</h5>
             </div>
             <div class="card-body">
-                <form method="post" action="{% url 'invite_user' organization.slug %}">
+                <form method="post" action="{% url 'mainapp:invite_user' organization.slug %}">>
                     {% csrf_token %}
                     {{ invite_form.as_p }}
                     <button type="submit" class="btn btn-primary">
@@ -42,7 +42,7 @@
                 <h5><i class="fas fa-users-plus"></i> Invitación Masiva</h5>
             </div>
             <div class="card-body">
-                <form method="post" action="{% url 'bulk_invite_users' organization.slug %}">
+                <form method="post" action="{% url 'mainapp:bulk_invite_users' organization.slug %}">>
                     {% csrf_token %}
                     {{ bulk_invite_form.as_p }}
                     <button type="submit" class="btn btn-success">
@@ -261,7 +261,7 @@
 <script>
 function changeRole(membershipId, newRole) {
     if (confirm('¿Estás seguro de que quieres cambiar el rol de este usuario?')) {
-        fetch(`{% url 'change_member_role' organization.slug 0 %}`.replace('0', membershipId), {
+        fetch(`{% url 'mainapp:change_member_role' organization.slug 0 %}`.replace('0', membershipId), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

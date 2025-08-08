@@ -57,14 +57,19 @@ def register(request):
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            login(request, user)
-            
-            # Log de registro
-            log_activity(user, 'login', f'Usuario registrado: {user.username}', request=request)
-            
-            messages.success(request, 'Registro exitoso. ¡Bienvenido al sistema!')
-            return redirect('select_organization')
+            try:
+                with transaction.atomic():
+                    user = form.save()
+                    login(request, user)
+                    
+                    # Log de registro
+                    log_activity(user, 'login', f'Usuario registrado: {user.username}', request=request)
+                    
+                    messages.success(request, 'Registro exitoso. ¡Bienvenido al sistema!')
+                    return redirect('mainapp:select_organization')
+            except Exception as e:
+                messages.error(request, f'Error durante el registro: {str(e)}')
+                return render(request, 'registration/register.html', {'form': form})
     else:
         form = UserRegistrationForm()
     return render(request, 'registration/register.html', {'form': form})
@@ -117,7 +122,7 @@ def create_organization(request):
                 )
                 
                 messages.success(request, f'Organización "{organization.name}" creada exitosamente.')
-                return redirect('dashboard', org_slug=organization.slug)
+                return redirect('mainapp:dashboard', org_slug=organization.slug)
     else:
         form = OrganizationCreationForm()
     
@@ -137,7 +142,7 @@ def dashboard(request, org_slug):
         )
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     # Obtener datos del dashboard
     org_forms = organization.forms.filter(is_active=True).order_by('-created_at')
@@ -180,10 +185,10 @@ def create_form(request, org_slug):
         )
         if not membership.can_edit_forms():
             messages.error(request, 'No tienes permisos para crear formularios.')
-            return redirect('dashboard', org_slug=org_slug)
+            return redirect('mainapp:dashboard', org_slug=org_slug)
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     if request.method == 'POST':
         form = DynamicFormCreationForm(request.POST)
@@ -202,7 +207,7 @@ def create_form(request, org_slug):
                 )
                 
                 messages.success(request, 'Formulario creado exitosamente.')
-                return redirect('edit_form', org_slug=org_slug, form_id=dynamic_form.id)
+                return redirect('mainapp:edit_form', org_slug=org_slug, form_id=dynamic_form.id)
     else:
         form = DynamicFormCreationForm()
     
@@ -226,10 +231,10 @@ def edit_form(request, org_slug, form_id):
         )
         if not membership.can_edit_forms():
             messages.error(request, 'No tienes permisos para editar formularios.')
-            return redirect('dashboard', org_slug=org_slug)
+            return redirect('mainapp:dashboard', org_slug=org_slug)
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     fields = dynamic_form.fields.all().order_by('order')
     field_types = FieldType.objects.all()
@@ -345,10 +350,10 @@ def delete_field(request, org_slug, field_id):
         )
         if not membership.can_edit_forms():
             messages.error(request, 'No tienes permisos para eliminar campos.')
-            return redirect('dashboard', org_slug=org_slug)
+            return redirect('mainapp:dashboard', org_slug=org_slug)
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     form_id = field.form.id
     
@@ -383,7 +388,7 @@ def delete_field(request, org_slug, field_id):
         dynamic_form.save()
     
     messages.success(request, f'Campo eliminado. Reembolso: {refund_amount} monedas.')
-    return redirect('edit_form', org_slug=org_slug, form_id=form_id)
+    return redirect('mainapp:edit_form', org_slug=org_slug, form_id=form_id)
 
 def view_form(request, org_slug, form_id):
     """Ver y enviar datos a un formulario público"""
@@ -403,7 +408,7 @@ def view_form(request, org_slug, form_id):
     
     if not has_access:
         messages.error(request, 'No tienes acceso a este formulario.')
-        return redirect('index')
+        return redirect('mainapp:index')
     
     fields = dynamic_form.fields.all().order_by('order')
     
@@ -441,7 +446,7 @@ def view_form(request, org_slug, form_id):
                     )
                 
             messages.success(request, 'Formulario enviado exitosamente.')
-            return redirect('form_success')
+            return redirect('mainapp:form_success')
     
     context = {
         'organization': organization,
@@ -467,10 +472,10 @@ def form_submissions(request, org_slug, form_id):
         )
         if not membership.can_view_submissions():
             messages.error(request, 'No tienes permisos para ver las respuestas.')
-            return redirect('dashboard', org_slug=org_slug)
+            return redirect('mainapp:dashboard', org_slug=org_slug)
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     submissions = dynamic_form.submissions.all().order_by('-submitted_at')
     fields = dynamic_form.fields.all().order_by('order')
@@ -518,10 +523,10 @@ def team_management(request, org_slug):
         )
         if not membership.can_manage_users():
             messages.error(request, 'No tienes permisos para gestionar usuarios.')
-            return redirect('dashboard', org_slug=org_slug)
+            return redirect('mainapp:dashboard', org_slug=org_slug)
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     team_members = organization.memberships.filter(is_active=True).order_by('-joined_at')
     
@@ -551,10 +556,10 @@ def activity_logs(request, org_slug):
         )
         if not membership.can_manage_users():
             messages.error(request, 'No tienes permisos para ver los logs.')
-            return redirect('dashboard', org_slug=org_slug)
+            return redirect('mainapp:dashboard', org_slug=org_slug)
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     logs = organization.activity_logs.all().order_by('-created_at')
     
@@ -635,27 +640,28 @@ def invite_user(request, org_slug):
                 messages.error(request, f'{email} ya es miembro de esta organización.')
             else:
                 # Agregar a la organización
-                OrganizationMembership.objects.create(
-                    user=invited_user,
-                    organization=organization,
-                    role=role,
-                    invited_by=request.user
-                )
-                
-                # Log de actividad
-                log_activity(
-                    user=request.user,
-                    action='user_invited',
-                    description=f'Usuario {email} invitado con rol {role}',
-                    organization=organization,
-                    request=request
-                )
-                
-                messages.success(request, f'Usuario {email} agregado exitosamente.')
+                with transaction.atomic():
+                    OrganizationMembership.objects.create(
+                        user=invited_user,
+                        organization=organization,
+                        role=role,
+                        invited_by=request.user
+                    )
+                    
+                    # Log de actividad
+                    log_activity(
+                        user=request.user,
+                        action='user_invited',
+                        description=f'Usuario {email} invitado con rol {role}',
+                        organization=organization,
+                        request=request
+                    )
+                    
+                    messages.success(request, f'Usuario {email} agregado exitosamente.')
         except CustomUser.DoesNotExist:
             messages.error(request, f'No existe un usuario con email {email}. El usuario debe registrarse primero.')
     
-    return redirect('team_management', org_slug=org_slug)
+    return redirect('mainapp:team_management', org_slug=org_slug)
 
 
 @login_required
@@ -678,7 +684,7 @@ def bulk_invite_users(request, org_slug):
     
     if not users_data:
         messages.error(request, 'No se proporcionaron datos de usuarios.')
-        return redirect('team_management', org_slug=org_slug)
+        return redirect('mainapp:team_management', org_slug=org_slug)
     
     success_count = 0
     error_count = 0
@@ -733,7 +739,7 @@ def bulk_invite_users(request, org_slug):
     if error_count > 0:
         messages.warning(request, f'{error_count} usuarios no pudieron ser agregados.')
     
-    return redirect('team_management', org_slug=org_slug)
+    return redirect('mainapp:team_management', org_slug=org_slug)
 
 
 @login_required
@@ -757,18 +763,19 @@ def change_member_role(request, org_slug, membership_id):
             new_role = data.get('role')
             
             if new_role in ['admin', 'editor', 'viewer']:
-                old_role = target_membership.role
-                target_membership.role = new_role
-                target_membership.save()
-                
-                # Log de actividad
-                log_activity(
-                    user=request.user,
-                    action='role_changed',
-                    description=f'Rol de {target_membership.user.username} cambiado de {old_role} a {new_role}',
-                    organization=organization,
-                    request=request
-                )
+                with transaction.atomic():
+                    old_role = target_membership.role
+                    target_membership.role = new_role
+                    target_membership.save()
+                    
+                    # Log de actividad
+                    log_activity(
+                        user=request.user,
+                        action='role_changed',
+                        description=f'Rol de {target_membership.user.username} cambiado de {old_role} a {new_role}',
+                        organization=organization,
+                        request=request
+                    )
                 
                 return JsonResponse({'success': True})
         
@@ -866,10 +873,10 @@ def form_templates(request, org_slug):
         )
         if not membership.can_edit_forms():
             messages.error(request, 'No tienes permisos para crear formularios.')
-            return redirect('dashboard', org_slug=org_slug)
+            return redirect('mainapp:dashboard', org_slug=org_slug)
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     templates = FormTemplate.objects.filter(is_active=True).order_by('category', 'name')
     categories = FormTemplate.CATEGORY_CHOICES
@@ -896,10 +903,10 @@ def create_form_from_template(request, org_slug, template_id):
         )
         if not membership.can_edit_forms():
             messages.error(request, 'No tienes permisos para crear formularios.')
-            return redirect('dashboard', org_slug=org_slug)
+            return redirect('mainapp:dashboard', org_slug=org_slug)
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     if request.method == 'POST':
         with transaction.atomic():
@@ -986,7 +993,7 @@ def create_form_from_template(request, org_slug, template_id):
             )
             
             messages.success(request, f'¡Formulario "{form.title}" creado exitosamente desde la plantilla!')
-            return redirect('edit_form', org_slug=org_slug, form_id=form.id)
+            return redirect('mainapp:edit_form', org_slug=org_slug, form_id=form.id)
     
     context = {
         'organization': organization,
@@ -1008,7 +1015,7 @@ def inventory_dashboard(request, org_slug):
         )
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     # Estadísticas de inventario
     items = InventoryItem.objects.filter(organization=organization, is_active=True)
@@ -1049,7 +1056,7 @@ def inventory_items(request, org_slug):
         )
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     items = InventoryItem.objects.filter(organization=organization, is_active=True).order_by('name')
     
@@ -1073,7 +1080,7 @@ def inventory_transactions(request, org_slug):
         )
     except OrganizationMembership.DoesNotExist:
         messages.error(request, 'No tienes acceso a esta organización.')
-        return redirect('select_organization')
+        return redirect('mainapp:select_organization')
     
     transactions = InventoryTransaction.objects.filter(
         organization=organization

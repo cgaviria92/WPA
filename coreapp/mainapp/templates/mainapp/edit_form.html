@@ -9,7 +9,7 @@
             <h1><i class="fas fa-edit"></i> Editando: {{ dynamic_form.title }}</h1>
             <div>
                 <span class="badge bg-info">Costo Total: {{ dynamic_form.total_cost }} monedas</span>
-                <a href="{% url 'view_form' organization.slug dynamic_form.id %}" class="btn btn-success btn-sm ms-2">
+                <a href="{% url 'mainapp:view_form' organization.slug dynamic_form.id %}" class="btn btn-success btn-sm ms-2">
                     <i class="fas fa-eye"></i> Vista Previa
                 </a>
             </div>
@@ -59,7 +59,7 @@
                                         <button type="button" class="btn btn-outline-primary btn-sm move-down" title="Bajar">
                                             <i class="fas fa-arrow-down"></i>
                                         </button>
-                                        <a href="{% url 'delete_field' organization.slug field.id %}" class="btn btn-outline-danger btn-sm" 
+                                        <a href="{% url 'mainapp:delete_field' organization.slug field.id %}" class="btn btn-outline-danger btn-sm" 
                                            onclick="return confirm('¿Estás seguro? Recibirás un reembolso del 50%')">
                                             <i class="fas fa-trash"></i>
                                         </a>
@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function() {
             choices: document.getElementById('choices').value
         };
 
-        fetch('{% url "add_field_to_form" organization.slug dynamic_form.id %}', {
+        fetch('{% url "mainapp:add_field_to_form" organization.slug dynamic_form.id %}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
