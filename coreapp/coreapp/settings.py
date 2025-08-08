@@ -30,6 +30,12 @@ ALLOWED_HOSTS = ['*']  # Permitir acceso desde cualquier IP en desarrollo
 
 
 AUTH_USER_MODEL = 'mainapp.CustomUser'
+
+# Authentication redirects
+LOGIN_REDIRECT_URL = '/organizations/'
+LOGOUT_REDIRECT_URL = '/'
+LOGIN_URL = '/login/'
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
