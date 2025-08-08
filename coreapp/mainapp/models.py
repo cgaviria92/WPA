@@ -77,6 +77,10 @@ class OrganizationMembership(models.Model):
     
     def can_manage_users(self):
         return self.role in ['owner', 'admin']
+    
+    def can_manage_organization(self):
+        """Solo owners y admins pueden editar la organización"""
+        return self.role in ['owner', 'admin']
 
 
 class FieldType(models.Model):

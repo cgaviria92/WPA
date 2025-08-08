@@ -128,6 +128,66 @@ def create_organization(request):
     
     return render(request, 'mainapp/create_organization.html', {'form': form})
 
+
+@login_required
+def edit_organization(request, org_slug):
+    """Editar información de la organización (solo owners y admins)"""
+    organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
+    
+    # Verificar permisos - solo owners y admins pueden editar
+    try:
+        membership = OrganizationMembership.objects.get(
+            user=request.user, organization=organization, is_active=True
+        )
+        if not membership.can_manage_organization():
+            messages.error(request, 'No tienes permisos para editar esta organización.')
+            return redirect('mainapp:dashboard', org_slug=org_slug)
+    except OrganizationMembership.DoesNotExist:
+        messages.error(request, 'No tienes acceso a esta organización.')
+        return redirect('mainapp:select_organization')
+    
+    if request.method == 'POST':
+        form = OrganizationCreationForm(request.POST, request.FILES, instance=organization)
+        if form.is_valid():
+            # Guardar el slug anterior para posibles redirecciones
+            old_slug = organization.slug
+            
+            # Guardar la organización
+            updated_organization = form.save(commit=False)
+            
+            # Regenerar slug si el nombre cambió
+            if updated_organization.name != organization.name:
+                base_slug = slugify(updated_organization.name)
+                slug = base_slug
+                counter = 1
+                while Organization.objects.filter(slug=slug).exclude(id=organization.id).exists():
+                    slug = f"{base_slug}-{counter}"
+                    counter += 1
+                updated_organization.slug = slug
+            
+            updated_organization.save()
+            
+            # Log de actividad
+            log_activity(
+                request.user, 'edit_organization',
+                f'Organización actualizada: {updated_organization.name}',
+                organization=updated_organization, request=request
+            )
+            
+            messages.success(request, f'Organización "{updated_organization.name}" actualizada exitosamente.')
+            
+            # Redirigir con el nuevo slug si cambió
+            return redirect('mainapp:dashboard', org_slug=updated_organization.slug)
+    else:
+        form = OrganizationCreationForm(instance=organization)
+    
+    context = {
+        'form': form,
+        'organization': organization,
+        'membership': membership,
+    }
+    return render(request, 'mainapp/edit_organization.html', context)
+
 @login_required
 def dashboard(request, org_slug):
     """Dashboard de la organización"""

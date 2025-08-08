@@ -15,6 +15,7 @@ urlpatterns = [
     
     # URLs específicas por organización
     path('org/<slug:org_slug>/', views.dashboard, name='dashboard'),
+    path('org/<slug:org_slug>/edit/', views.edit_organization, name='edit_organization'),
     path('org/<slug:org_slug>/forms/create/', views.create_form, name='create_form'),
     path('org/<slug:org_slug>/forms/create/from-template/<int:template_id>/', views.create_form_from_template, name='create_form_from_template'),
     path('org/<slug:org_slug>/forms/templates/', views.form_templates, name='form_templates'),

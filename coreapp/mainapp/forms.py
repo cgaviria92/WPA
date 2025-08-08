@@ -41,6 +41,29 @@ class OrganizationCreationForm(forms.ModelForm):
                 'accept': 'image/*'
             }),
         }
+        labels = {
+            'name': 'Nombre de la Organización',
+            'description': 'Descripción',
+            'logo': 'Logo de la Organización',
+        }
+        help_texts = {
+            'logo': 'Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 2MB.',
+        }
+    
+    def clean_logo(self):
+        logo = self.cleaned_data.get('logo')
+        if logo:
+            # Validar tamaño (máximo 2MB)
+            if logo.size > 2 * 1024 * 1024:  # 2MB en bytes
+                raise forms.ValidationError('El archivo es demasiado grande. Tamaño máximo: 2MB.')
+            
+            # Validar tipo de archivo
+            import mimetypes
+            file_type = mimetypes.guess_type(logo.name)[0]
+            if file_type not in ['image/jpeg', 'image/png', 'image/gif', 'image/webp']:
+                raise forms.ValidationError('Formato de archivo no válido. Use JPG, PNG, GIF o WebP.')
+        
+        return logo
 
 class DynamicFormCreationForm(forms.ModelForm):
     class Meta:

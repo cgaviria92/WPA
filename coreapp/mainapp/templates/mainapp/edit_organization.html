@@ -1,0 +1,145 @@
+{% extends 'mainapp/base.html' %}
+
+{% block title %}Editar Organización - {{ organization.name }} - {{ block.super }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4><i class="fas fa-edit"></i> Editar Organización</h4>
+                    <a href="{% url 'mainapp:dashboard' organization.slug %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Volver al Dashboard
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if membership.role == 'owner' %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-crown"></i> Como propietario, puedes modificar todos los aspectos de la organización.
+                    </div>
+                {% elif membership.role == 'admin' %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-shield-alt"></i> Como administrador, puedes editar la información básica de la organización.
+                    </div>
+                {% endif %}
+
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    
+                    <!-- Información actual -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <h6>Logo actual:</h6>
+                            {% if organization.logo %}
+                                <img src="{{ organization.logo.url }}" alt="Logo de {{ organization.name }}" 
+                                     class="img-thumbnail" style="max-width: 150px; max-height: 150px;">
+                            {% else %}
+                                <div class="bg-light border rounded d-flex align-items-center justify-content-center" 
+                                     style="width: 150px; height: 150px;">
+                                    <i class="fas fa-building fa-3x text-muted"></i>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-8">
+                            <h6>Información actual:</h6>
+                            <p><strong>Nombre:</strong> {{ organization.name }}</p>
+                            <p><strong>Slug:</strong> {{ organization.slug }}</p>
+                            <p><strong>Descripción:</strong> {{ organization.description|default:"Sin descripción" }}</p>
+                            <p><strong>Creada:</strong> {{ organization.created_at|date:"d/m/Y H:i" }}</p>
+                            <p><strong>Miembros:</strong> {{ organization.memberships.filter:is_active=True.count }}</p>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Formulario de edición -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label for="{{ form.name.id_for_label }}" class="form-label">
+                                    <i class="fas fa-building"></i> Nombre de la Organización
+                                </label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                    <div class="text-danger">{{ form.name.errors }}</div>
+                                {% endif %}
+                                <div class="form-text">
+                                    El slug se generará automáticamente si cambias el nombre.
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.description.id_for_label }}" class="form-label">
+                                    <i class="fas fa-align-left"></i> Descripción
+                                </label>
+                                {{ form.description }}
+                                {% if form.description.errors %}
+                                    <div class="text-danger">{{ form.description.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="{{ form.logo.id_for_label }}" class="form-label">
+                                    <i class="fas fa-image"></i> Logo de la Organización
+                                </label>
+                                {{ form.logo }}
+                                {% if form.logo.errors %}
+                                    <div class="text-danger">{{ form.logo.errors }}</div>
+                                {% endif %}
+                                <div class="form-text">
+                                    Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 2MB. Se recomienda 200x200px.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'mainapp:dashboard' organization.slug %}" class="btn btn-secondary me-md-2">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Información adicional para owners -->
+        {% if membership.role == 'owner' %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> Acciones Avanzadas</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-chart-bar"></i> Estadísticas</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>Formularios:</strong> {{ organization.forms.filter:is_active=True.count }}</li>
+                            <li><strong>Respuestas totales:</strong> 
+                                {% with total_submissions=organization.forms.all.submissions.count %}
+                                    {{ total_submissions }}
+                                {% endwith %}
+                            </li>
+                            <li><strong>Miembros activos:</strong> {{ organization.memberships.filter:is_active=True.count }}</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-cogs"></i> Configuración</h6>
+                        <a href="{% url 'mainapp:team_management' organization.slug %}" class="btn btn-outline-primary btn-sm d-block mb-2">
+                            <i class="fas fa-users"></i> Gestionar Equipo
+                        </a>
+                        <a href="{% url 'mainapp:activity_logs' organization.slug %}" class="btn btn-outline-info btn-sm d-block mb-2">
+                            <i class="fas fa-history"></i> Ver Logs de Actividad
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
