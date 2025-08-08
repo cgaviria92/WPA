@@ -878,6 +878,104 @@ def form_templates(request, org_slug):
         messages.error(request, 'No tienes acceso a esta organización.')
         return redirect('mainapp:select_organization')
     
+    # Manejar petición de preview
+    if request.GET.get('preview'):
+        template_id = request.GET.get('preview')
+        try:
+            template = FormTemplate.objects.get(id=template_id, is_active=True)
+            template_data = template.template_data  # Already a Python dict, no need to parse JSON
+            
+            # Procesar los campos para mostrar
+            fields_data = []
+            for field in template_data.get('fields', []):
+                fields_data.append({
+                    'label': field.get('label', ''),
+                    'field_type': field.get('field_type', ''),
+                    'is_required': field.get('is_required', False)
+                })
+            
+            # Procesar lógica de negocio para hacerla más amigable
+            business_logic_description = None
+            if template.business_logic:
+                # Crear una descripción más amigable basada en el tipo de plantilla
+                if template.category == 'sales':
+                    business_logic_description = {
+                        'title': 'Automización de Ventas',
+                        'features': [
+                            'Calcula automáticamente el total de la venta',
+                            'Determina el margen de ganancia por producto',
+                            'Verifica disponibilidad en inventario',
+                            'Actualiza stock automáticamente',
+                            'Genera reportes de rentabilidad'
+                        ]
+                    }
+                elif template.category == 'inventory':
+                    business_logic_description = {
+                        'title': 'Gestión de Inventario',
+                        'features': [
+                            'Rastrea movimientos de stock en tiempo real',
+                            'Calcula valores de inventario',
+                            'Genera alertas de stock bajo',
+                            'Controla entradas y salidas',
+                            'Mantiene histórico de transacciones'
+                        ]
+                    }
+                elif template.category == 'hr':
+                    business_logic_description = {
+                        'title': 'Recursos Humanos',
+                        'features': [
+                            'Valida información de empleados',
+                            'Calcula beneficios automáticamente',
+                            'Genera expedientes digitales',
+                            'Controla accesos y permisos',
+                            'Procesa evaluaciones de desempeño'
+                        ]
+                    }
+                elif template.category == 'customer':
+                    business_logic_description = {
+                        'title': 'Atención al Cliente',
+                        'features': [
+                            'Categoriza tickets automáticamente',
+                            'Asigna prioridades por urgencia',
+                            'Envía notificaciones automáticas',
+                            'Rastrea tiempos de respuesta',
+                            'Genera métricas de satisfacción'
+                        ]
+                    }
+                elif template.category == 'finance':
+                    business_logic_description = {
+                        'title': 'Gestión Financiera',
+                        'features': [
+                            'Calcula totales y subtotales automáticamente',
+                            'Genera reportes contables',
+                            'Controla presupuestos y gastos',
+                            'Valida transacciones financieras',
+                            'Mantiene histórico de movimientos'
+                        ]
+                    }
+                else:
+                    business_logic_description = {
+                        'title': 'Automatización Personalizada',
+                        'features': [
+                            'Procesa datos automáticamente',
+                            'Valida información ingresada',
+                            'Genera reportes dinámicos',
+                            'Integra con otros sistemas',
+                            'Mantiene auditoría completa'
+                        ]
+                    }
+            
+            preview_data = {
+                'fields': fields_data,
+                'business_logic': business_logic_description
+            }
+            
+            return JsonResponse(preview_data)
+        except FormTemplate.DoesNotExist:
+            return JsonResponse({'error': 'Plantilla no encontrada'}, status=404)
+        except Exception as e:
+            return JsonResponse({'error': f'Error al procesar la plantilla: {str(e)}'}, status=500)
+    
     templates = FormTemplate.objects.filter(is_active=True).order_by('category', 'name')
     categories = FormTemplate.CATEGORY_CHOICES
     

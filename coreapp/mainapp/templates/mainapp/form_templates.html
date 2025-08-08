@@ -249,38 +249,64 @@
         // Mostrar modal
         modal.show();
 
-        // Cargar contenido (simulado por ahora)
-        setTimeout(() => {
-            fetch(`{% url 'mainapp:form_templates' org_slug=organization.slug %}?preview=${templateId}`)
-                .then(response => response.json())
-                .then(data => {
-                    let fieldsHtml = '<div class="mb-3"><h6>Campos que se crearán:</h6><ul class="list-group">';
-                    data.fields.forEach(field => {
-                        fieldsHtml += `<li class="list-group-item d-flex justify-content-between">
-                            <span><strong>${field.label}</strong> - ${field.field_type}</span>
-                            ${field.is_required ? '<span class="badge bg-warning">Requerido</span>' : ''}
-                        </li>`;
-                    });
-                    fieldsHtml += '</ul></div>';
-                    
-                    if (data.business_logic) {
-                        fieldsHtml += `<div class="alert alert-info">
-                            <i class="fas fa-cogs me-2"></i>
-                            <strong>Lógica de negocio incluida:</strong> ${data.business_logic}
-                        </div>`;
-                    }
-                    
-                    content.innerHTML = fieldsHtml;
-                    
-                    // Configurar botón de usar plantilla
-                    useBtn.onclick = () => {
-                        window.location.href = `{% url 'mainapp:create_form_from_template' org_slug=organization.slug template_id=0 %}`.replace('0', templateId);
-                    };
-                })
-                .catch(error => {
-                    content.innerHTML = '<div class="alert alert-danger">Error al cargar la vista previa</div>';
+        // Cargar contenido
+        content.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin me-2"></i>Cargando vista previa...</div>';
+        
+        fetch(`{% url 'mainapp:form_templates' org_slug=organization.slug %}?preview=${templateId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                let fieldsHtml = '<div class="mb-3"><h6><i class="fas fa-list me-2"></i>Campos que se crearán:</h6><ul class="list-group">';
+                data.fields.forEach(field => {
+                    fieldsHtml += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${field.label}</strong>
+                            <small class="text-muted d-block">${field.field_type}</small>
+                        </div>
+                        ${field.is_required ? '<span class="badge bg-warning">Requerido</span>' : '<span class="badge bg-secondary">Opcional</span>'}
+                    </li>`;
                 });
-        }, 500);
+                fieldsHtml += '</ul></div>';
+                
+                if (data.business_logic) {
+                    fieldsHtml += `<div class="alert alert-info">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-magic me-2"></i>
+                            <strong>${data.business_logic.title}</strong>
+                        </div>
+                        <p class="mb-2 small">Esta plantilla incluye automatización avanzada:</p>
+                        <ul class="mb-0 small">`;
+                    
+                    data.business_logic.features.forEach(feature => {
+                        fieldsHtml += `<li><i class="fas fa-check text-success me-1"></i>${feature}</li>`;
+                    });
+                    
+                    fieldsHtml += `</ul>
+                    </div>`;
+                }
+                
+                content.innerHTML = fieldsHtml;
+                
+                // Configurar botón de usar plantilla
+                useBtn.onclick = () => {
+                    window.location.href = `{% url 'mainapp:create_form_from_template' org_slug=organization.slug template_id=0 %}`.replace('0', templateId);
+                };
+            })
+            .catch(error => {
+                console.error('Error loading template preview:', error);
+                content.innerHTML = `<div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error al cargar la vista previa: ${error.message}
+                </div>`;
+            });
     }
 
     // Inicializar animaciones
