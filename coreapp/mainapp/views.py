@@ -1017,7 +1017,6 @@ def create_form_from_template(request, org_slug, template_id):
                 creator=request.user,
                 title=template_data.get('title', template.name),
                 description=template.description,
-                submissions_label=template_data.get('submissions_label', 'Respuestas'),
                 is_public=template_data.get('is_public', False)
             )
             

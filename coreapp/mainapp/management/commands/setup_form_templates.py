@@ -18,20 +18,20 @@ class Command(BaseCommand):
                     'submissions_label': 'Transacciones',
                     'fields': [
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'choice',
                             'label': 'Tipo de Transacción',
                             'choices': 'Compra\nVenta\nAjuste\nDevolución',
                             'is_required': True,
                             'help_text': 'Selecciona el tipo de movimiento'
                         },
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'Producto/Artículo',
                             'is_required': True,
                             'help_text': 'Nombre del producto'
                         },
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'SKU/Código',
                             'is_required': True,
                             'help_text': 'Código único del producto'
@@ -49,12 +49,12 @@ class Command(BaseCommand):
                             'help_text': 'Precio por unidad'
                         },
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'Proveedor/Cliente',
                             'help_text': 'Nombre del proveedor o cliente'
                         },
                         {
-                            'field_type': 'text_long',
+                            'field_type': 'textarea',
                             'label': 'Notas',
                             'help_text': 'Observaciones adicionales'
                         }
@@ -118,12 +118,12 @@ def process_inventory_transaction(submission_data):
                             'is_required': True
                         },
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'Cliente',
                             'is_required': True
                         },
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'Producto Vendido',
                             'is_required': True
                         },
@@ -138,13 +138,13 @@ def process_inventory_transaction(submission_data):
                             'is_required': True
                         },
                         {
-                            'field_type': 'selection',
+                            'field_type': 'choice',
                             'label': 'Método de Pago',
                             'choices': 'Efectivo\nTarjeta\nTransferencia\nCrédito',
                             'is_required': True
                         },
                         {
-                            'field_type': 'text_long',
+                            'field_type': 'textarea',
                             'label': 'Observaciones'
                         }
                     ]
@@ -186,7 +186,7 @@ def process_sale(submission_data):
                     'submissions_label': 'Empleados',
                     'fields': [
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'Nombre Completo',
                             'is_required': True
                         },
@@ -196,18 +196,18 @@ def process_sale(submission_data):
                             'is_required': True
                         },
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'Teléfono',
                             'is_required': True
                         },
                         {
-                            'field_type': 'selection',
+                            'field_type': 'choice',
                             'label': 'Departamento',
                             'choices': 'Administración\nVentas\nIT\nRecursos Humanos\nContabilidad\nOperaciones',
                             'is_required': True
                         },
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'Cargo',
                             'is_required': True
                         },
@@ -222,7 +222,7 @@ def process_sale(submission_data):
                             'is_required': True
                         },
                         {
-                            'field_type': 'text_long',
+                            'field_type': 'textarea',
                             'label': 'Observaciones'
                         }
                     ]
@@ -238,7 +238,7 @@ def process_sale(submission_data):
                     'submissions_label': 'Tickets',
                     'fields': [
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'Nombre del Cliente',
                             'is_required': True
                         },
@@ -248,24 +248,24 @@ def process_sale(submission_data):
                             'is_required': True
                         },
                         {
-                            'field_type': 'selection',
+                            'field_type': 'choice',
                             'label': 'Prioridad',
                             'choices': 'Baja\nMedia\nAlta\nUrgente',
                             'is_required': True
                         },
                         {
-                            'field_type': 'selection',
+                            'field_type': 'choice',
                             'label': 'Categoría',
                             'choices': 'Técnico\nFacturación\nConsulta General\nReclamo\nSugerencia',
                             'is_required': True
                         },
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'Asunto',
                             'is_required': True
                         },
                         {
-                            'field_type': 'text_long',
+                            'field_type': 'textarea',
                             'label': 'Descripción del Problema',
                             'is_required': True
                         },
@@ -291,13 +291,13 @@ def process_sale(submission_data):
                             'is_required': True
                         },
                         {
-                            'field_type': 'selection',
+                            'field_type': 'choice',
                             'label': 'Categoría',
                             'choices': 'Oficina\nTransporte\nComidas\nMaterial\nServicios\nMarketing\nOtros',
                             'is_required': True
                         },
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'Concepto',
                             'is_required': True
                         },
@@ -307,12 +307,12 @@ def process_sale(submission_data):
                             'is_required': True
                         },
                         {
-                            'field_type': 'text_short',
+                            'field_type': 'text',
                             'label': 'Proveedor',
                             'is_required': True
                         },
                         {
-                            'field_type': 'selection',
+                            'field_type': 'choice',
                             'label': 'Método de Pago',
                             'choices': 'Efectivo\nTarjeta Corporativa\nTransferencia\nCheque',
                             'is_required': True
