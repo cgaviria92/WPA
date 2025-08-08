@@ -140,6 +140,21 @@ class DynamicFormField(models.Model):
     min_value = models.FloatField(null=True, blank=True, help_text="Para campos numéricos")
     max_value = models.FloatField(null=True, blank=True, help_text="Para campos numéricos")
     
+    # Configuraciones para campos de archivo
+    max_file_size_mb = models.FloatField(
+        null=True, blank=True, default=5.0,
+        help_text="Tamaño máximo del archivo en MB (por defecto 5 MB)"
+    )
+    allowed_file_types = models.CharField(
+        max_length=500, blank=True,
+        default="image/*,application/pdf,.doc,.docx,.txt",
+        help_text="Tipos de archivo permitidos separados por comas (ej: image/*,application/pdf,.txt)"
+    )
+    file_cost_per_mb = models.FloatField(
+        null=True, blank=True, default=1.0,
+        help_text="Costo en monedas por MB de archivo subido"
+    )
+    
     class Meta:
         ordering = ['order']
     
@@ -147,6 +162,32 @@ class DynamicFormField(models.Model):
         if self.choices:
             return [choice.strip() for choice in self.choices.split('\n') if choice.strip()]
         return []
+    
+    def get_allowed_file_types_list(self):
+        """Devuelve lista de tipos de archivo permitidos"""
+        if self.allowed_file_types:
+            return [ftype.strip() for ftype in self.allowed_file_types.split(',') if ftype.strip()]
+        return ['image/*', 'application/pdf', '.txt']
+    
+    def calculate_file_cost(self, file_size_bytes):
+        """Calcula el costo de subir un archivo basado en su tamaño"""
+        if not self.file_cost_per_mb or file_size_bytes <= 0:
+            return 0
+        
+        size_mb = file_size_bytes / (1024 * 1024)  # Convertir bytes a MB
+        return max(1, int(size_mb * self.file_cost_per_mb))  # Mínimo 1 moneda
+    
+    def validate_file_size(self, file_size_bytes):
+        """Valida que el archivo no exceda el tamaño máximo"""
+        if not self.max_file_size_mb:
+            return True
+        
+        max_size_bytes = self.max_file_size_mb * 1024 * 1024
+        return file_size_bytes <= max_size_bytes
+    
+    def get_max_file_size_bytes(self):
+        """Devuelve el tamaño máximo en bytes"""
+        return int((self.max_file_size_mb or 5.0) * 1024 * 1024)
     
     def __str__(self):
         return f"{self.form.title} - {self.label}"
@@ -165,6 +206,34 @@ class FormSubmission(models.Model):
     
     def __str__(self):
         return f"Envío de {self.form.title} - {self.submitted_at}"
+
+
+class UploadedFile(models.Model):
+    """Archivo subido a través de un formulario"""
+    submission = models.ForeignKey(FormSubmission, on_delete=models.CASCADE, related_name='files')
+    field = models.ForeignKey(DynamicFormField, on_delete=models.CASCADE)
+    file = models.FileField(upload_to='uploads/%Y/%m/%d/')
+    original_name = models.CharField(max_length=255)
+    file_size = models.PositiveIntegerField(help_text="Tamaño en bytes")
+    mime_type = models.CharField(max_length=100)
+    cost_charged = models.PositiveIntegerField(default=0, help_text="Monedas cobradas por este archivo")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    uploaded_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-uploaded_at']
+    
+    def __str__(self):
+        return f"{self.original_name} ({self.get_file_size_display()})"
+    
+    def get_file_size_display(self):
+        """Devuelve el tamaño del archivo en formato legible"""
+        if self.file_size < 1024:
+            return f"{self.file_size} B"
+        elif self.file_size < 1024 * 1024:
+            return f"{self.file_size / 1024:.1f} KB"
+        else:
+            return f"{self.file_size / (1024 * 1024):.1f} MB"
 
 
 class CoinTransaction(models.Model):

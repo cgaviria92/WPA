@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     CustomUser, Organization, OrganizationMembership, FieldType, 
-    DynamicForm, DynamicFormField, FormSubmission, CoinTransaction, ActivityLog
+    DynamicForm, DynamicFormField, FormSubmission, CoinTransaction, ActivityLog, UploadedFile
 )
 
 @admin.register(CustomUser)
@@ -62,3 +62,14 @@ class ActivityLogAdmin(admin.ModelAdmin):
     list_filter = ['action', 'created_at', 'organization']
     readonly_fields = ['created_at']
     search_fields = ['user__username', 'description']
+
+@admin.register(UploadedFile)
+class UploadedFileAdmin(admin.ModelAdmin):
+    list_display = ['original_name', 'submission', 'field', 'get_file_size_display', 'cost_charged', 'uploaded_at']
+    list_filter = ['uploaded_at', 'field__field_type', 'submission__form__organization']
+    readonly_fields = ['uploaded_at', 'file_size', 'mime_type', 'cost_charged']
+    search_fields = ['original_name', 'submission__form__title']
+    
+    def get_file_size_display(self, obj):
+        return obj.get_file_size_display()
+    get_file_size_display.short_description = 'Tamaño'

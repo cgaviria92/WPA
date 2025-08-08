@@ -70,7 +70,11 @@ class DynamicFormCreationForm(forms.ModelForm):
 class DynamicFormFieldForm(forms.ModelForm):
     class Meta:
         model = DynamicFormField
-        fields = ['field_type', 'label', 'help_text', 'is_required', 'choices', 'max_length', 'min_value', 'max_value']
+        fields = [
+            'field_type', 'label', 'help_text', 'is_required', 'choices', 
+            'max_length', 'min_value', 'max_value',
+            'max_file_size_mb', 'allowed_file_types', 'file_cost_per_mb'
+        ]
         widgets = {
             'field_type': forms.Select(attrs={'class': 'form-control'}),
             'label': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Etiqueta del campo'}),
@@ -80,6 +84,30 @@ class DynamicFormFieldForm(forms.ModelForm):
             'max_length': forms.NumberInput(attrs={'class': 'form-control'}),
             'min_value': forms.NumberInput(attrs={'class': 'form-control'}),
             'max_value': forms.NumberInput(attrs={'class': 'form-control'}),
+            'max_file_size_mb': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'step': '0.1',
+                'placeholder': '5.0'
+            }),
+            'allowed_file_types': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'image/*,application/pdf,.doc,.docx,.txt'
+            }),
+            'file_cost_per_mb': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'step': '0.1',
+                'placeholder': '1.0'
+            }),
+        }
+        labels = {
+            'max_file_size_mb': 'Tamaño máximo (MB)',
+            'allowed_file_types': 'Tipos de archivo permitidos',
+            'file_cost_per_mb': 'Costo por MB (monedas)',
+        }
+        help_texts = {
+            'max_file_size_mb': 'Tamaño máximo del archivo en megabytes',
+            'allowed_file_types': 'Tipos MIME o extensiones separados por comas (ej: image/*,application/pdf,.txt)',
+            'file_cost_per_mb': 'Monedas que se cobrarán por cada MB subido',
         }
     
     def __init__(self, *args, **kwargs):
@@ -201,3 +229,75 @@ class BulkUserInviteForm(forms.Form):
                 raise forms.ValidationError(f'Rol inválido: {role}. Usa: {", ".join(valid_roles)}')
         
         return data
+
+
+class CustomFileField(forms.FileField):
+    """Campo de archivo personalizado con validaciones de tamaño y tipo"""
+    
+    def __init__(self, form_field, *args, **kwargs):
+        self.form_field = form_field
+        super().__init__(*args, **kwargs)
+        
+        # Configurar validaciones basadas en el campo del formulario
+        if form_field.max_file_size_mb:
+            self.max_size = form_field.get_max_file_size_bytes()
+        
+        if form_field.allowed_file_types:
+            self.allowed_types = form_field.get_allowed_file_types_list()
+    
+    def validate(self, value):
+        super().validate(value)
+        
+        if value is None:
+            return
+        
+        # Validar tamaño
+        if hasattr(self, 'max_size') and value.size > self.max_size:
+            max_mb = self.max_size / (1024 * 1024)
+            current_mb = value.size / (1024 * 1024)
+            raise forms.ValidationError(
+                f'El archivo es demasiado grande ({current_mb:.1f} MB). '
+                f'El tamaño máximo permitido es {max_mb:.1f} MB.'
+            )
+        
+        # Validar tipo de archivo
+        if hasattr(self, 'allowed_types'):
+            import mimetypes
+            file_type = mimetypes.guess_type(value.name)[0] or ''
+            file_ext = '.' + value.name.split('.')[-1].lower() if '.' in value.name else ''
+            
+            type_allowed = False
+            for allowed in self.allowed_types:
+                if allowed.startswith('.'):  # Es una extensión
+                    if file_ext == allowed.lower():
+                        type_allowed = True
+                        break
+                elif '/' in allowed:  # Es un tipo MIME
+                    if allowed.endswith('/*'):  # Tipo general como image/*
+                        if file_type.startswith(allowed[:-1]):
+                            type_allowed = True
+                            break
+                    elif file_type == allowed:  # Tipo específico
+                        type_allowed = True
+                        break
+            
+            if not type_allowed:
+                allowed_display = ', '.join(self.allowed_types)
+                raise forms.ValidationError(
+                    f'Tipo de archivo no permitido. Tipos permitidos: {allowed_display}'
+                )
+
+
+class FileUploadForm(forms.Form):
+    """Formulario dinámico para subir archivos"""
+    
+    def __init__(self, form_fields, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        for field in form_fields:
+            if field.field_type.name == 'file':
+                self.fields[f'field_{field.id}'] = CustomFileField(
+                    form_field=field,
+                    required=field.is_required,
+                    help_text=field.help_text
+                )

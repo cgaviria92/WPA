@@ -14,7 +14,7 @@
             </div>
             <div class="card-body">
                 {% if fields %}
-                    <form method="post">
+                    <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
                         {% for field in fields %}
                             <div class="mb-3">
@@ -51,7 +51,19 @@
                                 
                                 {% elif field.field_type.name == 'file' %}
                                     <input type="file" class="form-control" name="field_{{ field.id }}"
-                                           {% if field.is_required %}required{% endif %}>
+                                           {% if field.is_required %}required{% endif %}
+                                           {% if field.allowed_file_types %}accept="{{ field.allowed_file_types }}"{% endif %}>
+                                    <div class="form-text">
+                                        {% if field.max_file_size_mb %}
+                                            <i class="fas fa-weight"></i> Tamaño máximo: {{ field.max_file_size_mb }} MB
+                                        {% endif %}
+                                        {% if field.file_cost_per_mb %}
+                                            <br><i class="fas fa-coins"></i> Costo: {{ field.file_cost_per_mb }} monedas por MB
+                                        {% endif %}
+                                        {% if field.allowed_file_types %}
+                                            <br><i class="fas fa-file-alt"></i> Tipos permitidos: {{ field.allowed_file_types }}
+                                        {% endif %}
+                                    </div>
                                 
                                 {% elif field.field_type.name == 'boolean' %}
                                     <div class="form-check">
@@ -103,4 +115,66 @@
         </div>
     </div>
 </div>
+
+<script>
+// Calcular costo de archivos en tiempo real
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    let totalCostDisplay = null;
+    
+    // Crear display de costo total si hay campos de archivo
+    if (fileInputs.length > 0) {
+        const form = document.querySelector('form');
+        const costDisplay = document.createElement('div');
+        costDisplay.className = 'alert alert-info mt-3';
+        costDisplay.innerHTML = '<i class="fas fa-coins"></i> <strong>Costo total de archivos:</strong> <span id="total-cost">0</span> monedas';
+        form.appendChild(costDisplay);
+        totalCostDisplay = document.getElementById('total-cost');
+    }
+    
+    fileInputs.forEach(function(input) {
+        const fieldId = input.name.replace('field_', '');
+        const costPerMB = parseFloat(input.closest('.mb-3').querySelector('.form-text')?.textContent?.match(/(\d+\.?\d*) monedas por MB/)?.[1] || 0);
+        
+        input.addEventListener('change', function() {
+            calculateTotalCost();
+        });
+    });
+    
+    function calculateTotalCost() {
+        let totalCost = 0;
+        
+        fileInputs.forEach(function(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const fileSizeMB = file.size / (1024 * 1024);
+                const costPerMB = parseFloat(input.closest('.mb-3').querySelector('.form-text')?.textContent?.match(/(\d+\.?\d*) monedas por MB/)?.[1] || 0);
+                const fileCost = Math.max(1, Math.round(fileSizeMB * costPerMB));
+                totalCost += fileCost;
+                
+                // Mostrar costo individual del archivo
+                let fileInfo = input.nextElementSibling?.nextElementSibling;
+                if (!fileInfo || !fileInfo.classList.contains('file-cost-info')) {
+                    fileInfo = document.createElement('div');
+                    fileInfo.className = 'file-cost-info text-info mt-1';
+                    input.parentNode.appendChild(fileInfo);
+                }
+                fileInfo.innerHTML = `<small><i class="fas fa-file"></i> ${file.name} (${fileSizeMB.toFixed(1)} MB) - <strong>${fileCost} monedas</strong></small>`;
+            } else {
+                // Remover info del archivo si no hay archivo seleccionado
+                const fileInfo = input.parentNode.querySelector('.file-cost-info');
+                if (fileInfo) {
+                    fileInfo.remove();
+                }
+            }
+        });
+        
+        if (totalCostDisplay) {
+            totalCostDisplay.textContent = totalCost;
+            totalCostDisplay.parentElement.className = totalCost > 0 ? 'alert alert-warning mt-3' : 'alert alert-info mt-3';
+        }
+    }
+});
+</script>
+
 {% endblock %}

@@ -416,16 +416,81 @@ def view_form(request, org_slug, form_id):
         submission_data = {}
         valid = True
         errors = {}
+        total_file_cost = 0
+        uploaded_files = []
         
         for field in fields:
             field_name = f'field_{field.id}'
-            value = request.POST.get(field_name)
             
-            if field.is_required and not value:
-                valid = False
-                errors[field_name] = 'Este campo es obligatorio'
+            # Manejar campos de archivo
+            if field.field_type.name == 'file':
+                uploaded_file = request.FILES.get(field_name)
+                
+                if field.is_required and not uploaded_file:
+                    valid = False
+                    errors[field_name] = 'Este campo es obligatorio'
+                elif uploaded_file:
+                    # Validar tamaño del archivo
+                    if not field.validate_file_size(uploaded_file.size):
+                        valid = False
+                        max_mb = field.max_file_size_mb or 5.0
+                        current_mb = uploaded_file.size / (1024 * 1024)
+                        errors[field_name] = f'Archivo demasiado grande ({current_mb:.1f} MB). Máximo: {max_mb} MB'
+                    else:
+                        # Validar tipo de archivo
+                        import mimetypes
+                        file_type = mimetypes.guess_type(uploaded_file.name)[0] or ''
+                        file_ext = '.' + uploaded_file.name.split('.')[-1].lower() if '.' in uploaded_file.name else ''
+                        allowed_types = field.get_allowed_file_types_list()
+                        
+                        type_allowed = False
+                        for allowed in allowed_types:
+                            if allowed.startswith('.'):  # Es una extensión
+                                if file_ext == allowed.lower():
+                                    type_allowed = True
+                                    break
+                            elif '/' in allowed:  # Es un tipo MIME
+                                if allowed.endswith('/*'):  # Tipo general como image/*
+                                    if file_type.startswith(allowed[:-1]):
+                                        type_allowed = True
+                                        break
+                                elif file_type == allowed:  # Tipo específico
+                                    type_allowed = True
+                                    break
+                        
+                        if not type_allowed:
+                            valid = False
+                            allowed_display = ', '.join(allowed_types)
+                            errors[field_name] = f'Tipo de archivo no permitido. Permitidos: {allowed_display}'
+                        else:
+                            # Calcular costo del archivo
+                            file_cost = field.calculate_file_cost(uploaded_file.size)
+                            total_file_cost += file_cost
+                            
+                            # Almacenar información del archivo para procesamiento posterior
+                            uploaded_files.append({
+                                'field': field,
+                                'file': uploaded_file,
+                                'cost': file_cost,
+                                'file_type': file_type
+                            })
+                            
+                            submission_data[field_name] = f"archivo_{uploaded_file.name}"
             else:
-                submission_data[field_name] = value
+                # Manejar otros tipos de campo
+                value = request.POST.get(field_name)
+                
+                if field.is_required and not value:
+                    valid = False
+                    errors[field_name] = 'Este campo es obligatorio'
+                else:
+                    submission_data[field_name] = value
+        
+        # Verificar si el usuario tiene suficientes monedas para los archivos
+        if valid and total_file_cost > 0 and request.user.is_authenticated:
+            if request.user.monedas < total_file_cost:
+                valid = False
+                errors['__all__'] = f'No tienes suficientes monedas para subir los archivos. Necesitas {total_file_cost} monedas, tienes {request.user.monedas}.'
         
         if valid:
             with transaction.atomic():
@@ -437,15 +502,58 @@ def view_form(request, org_slug, form_id):
                     ip_address=get_client_ip(request)
                 )
                 
+                # Procesar archivos subidos
+                for file_info in uploaded_files:
+                    from .models import UploadedFile
+                    
+                    uploaded_file_obj = UploadedFile.objects.create(
+                        submission=submission,
+                        field=file_info['field'],
+                        file=file_info['file'],
+                        original_name=file_info['file'].name,
+                        file_size=file_info['file'].size,
+                        mime_type=file_info['file_type'],
+                        cost_charged=file_info['cost'],
+                        uploaded_by=request.user if request.user.is_authenticated else None
+                    )
+                    
+                    # Actualizar referencia en submission_data
+                    field_name = f'field_{file_info["field"].id}'
+                    submission_data[field_name] = uploaded_file_obj.file.url
+                
+                # Actualizar los datos del submission con las URLs de los archivos
+                submission.data = submission_data
+                submission.save()
+                
+                # Cobrar monedas por los archivos
+                if total_file_cost > 0 and request.user.is_authenticated:
+                    request.user.monedas -= total_file_cost
+                    request.user.save()
+                    
+                    # Registrar transacción
+                    from .models import CoinTransaction
+                    CoinTransaction.objects.create(
+                        user=request.user,
+                        organization=organization,
+                        transaction_type='spend',
+                        amount=total_file_cost,
+                        description=f'Subida de archivos en formulario: {dynamic_form.title}',
+                        related_form=dynamic_form
+                    )
+                
                 # Log de actividad
                 if request.user.is_authenticated:
                     log_activity(
                         request.user, 'submit_form',
-                        f'Formulario enviado: {dynamic_form.title}',
+                        f'Formulario enviado: {dynamic_form.title}' + 
+                        (f' (archivos: {len(uploaded_files)}, costo: {total_file_cost} monedas)' if uploaded_files else ''),
                         organization=organization, form=dynamic_form, request=request
                     )
                 
-            messages.success(request, 'Formulario enviado exitosamente.')
+            messages.success(request, 
+                f'Formulario enviado exitosamente.' + 
+                (f' Archivos subidos: {len(uploaded_files)}. Costo: {total_file_cost} monedas.' if uploaded_files else '')
+            )
             return redirect('mainapp:form_success')
     
     context = {

@@ -44,12 +44,27 @@
                                     <div class="col-md-6 mb-3">
                                         <strong>{{ field.label }}:</strong><br>
                                         {% with field_key=field.id|field_key %}
-                                            <!-- Debug: Campo {{ field.id }} -> {{ field_key }} -->
-                                            <!-- Debug: Datos: {{ submission.data }} -->
-                                            {% if submission.data|lookup:field_key %}
-                                                <span class="text-muted">{{ submission.data|lookup:field_key }}</span>
+                                            {% if field.field_type.name == 'file' %}
+                                                {% for file in submission.files.all %}
+                                                    {% if file.field_id == field.id %}
+                                                        <div class="file-item mb-2">
+                                                            <a href="{{ file.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                                <i class="fas fa-download"></i> {{ file.original_name }}
+                                                            </a>
+                                                            <br><small class="text-muted">
+                                                                {{ file.get_file_size_display }} - {{ file.cost_charged }} monedas
+                                                            </small>
+                                                        </div>
+                                                    {% endif %}
+                                                {% empty %}
+                                                    <span class="text-muted fst-italic">Sin archivo</span>
+                                                {% endfor %}
                                             {% else %}
-                                                <span class="text-muted fst-italic">Sin respuesta</span>
+                                                {% if submission.data|lookup:field_key %}
+                                                    <span class="text-muted">{{ submission.data|lookup:field_key }}</span>
+                                                {% else %}
+                                                    <span class="text-muted fst-italic">Sin respuesta</span>
+                                                {% endif %}
                                             {% endif %}
                                         {% endwith %}
                                     </div>
