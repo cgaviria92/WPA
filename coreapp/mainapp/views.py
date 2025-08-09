@@ -17,6 +17,7 @@ from .forms import (
     DynamicFormCreationForm, DynamicFormFieldForm, UserRegistrationForm,
     OrganizationCreationForm, UserInvitationForm, BulkUserInviteForm
 )
+from .service_factory import FormProcessor, ServiceFactory
 import json
 
 def get_client_ip(request):
@@ -459,177 +460,65 @@ def delete_field(request, org_slug, field_id):
     return redirect('mainapp:edit_form', org_slug=org_slug, form_id=form_id)
 
 def view_form(request, org_slug, form_id):
-    """Ver y enviar datos a un formulario público"""
+    """
+    Ver y enviar datos a un formulario público
+    Refactorizado siguiendo principios SOLID
+    """
+    # Obtener objetos básicos
     organization = get_object_or_404(Organization, slug=org_slug, is_active=True)
     dynamic_form = get_object_or_404(DynamicForm, id=form_id, organization=organization, is_active=True)
     
-    # Verificar si el formulario es público o el usuario tiene acceso
-    has_access = dynamic_form.is_public
-    if not has_access and request.user.is_authenticated:
-        try:
-            membership = OrganizationMembership.objects.get(
-                user=request.user, organization=organization, is_active=True
-            )
-            has_access = True
-        except OrganizationMembership.DoesNotExist:
-            pass
+    # Inicializar procesador de formularios
+    form_processor = FormProcessor()
     
-    if not has_access:
-        messages.error(request, 'No tienes acceso a este formulario.')
+    # Verificar acceso usando el servicio de permisos
+    if not form_processor.check_form_access(request.user, organization, dynamic_form):
+        form_processor.send_error_notification(request, 'No tienes acceso a este formulario.')
         return redirect('mainapp:index')
     
-    fields = dynamic_form.fields.all().order_by('order')
-    
+    # Manejar envío del formulario
     if request.method == 'POST':
-        submission_data = {}
-        valid = True
-        errors = {}
-        total_file_cost = 0
-        uploaded_files = []
-        
-        for field in fields:
-            field_name = f'field_{field.id}'
-            
-            # Manejar campos de archivo
-            if field.field_type.name == 'file':
-                uploaded_file = request.FILES.get(field_name)
-                
-                if field.is_required and not uploaded_file:
-                    valid = False
-                    errors[field_name] = 'Este campo es obligatorio'
-                elif uploaded_file:
-                    # Validar tamaño del archivo
-                    if not field.validate_file_size(uploaded_file.size):
-                        valid = False
-                        max_mb = field.max_file_size_mb or 5.0
-                        current_mb = uploaded_file.size / (1024 * 1024)
-                        errors[field_name] = f'Archivo demasiado grande ({current_mb:.1f} MB). Máximo: {max_mb} MB'
-                    else:
-                        # Validar tipo de archivo
-                        import mimetypes
-                        file_type = mimetypes.guess_type(uploaded_file.name)[0] or ''
-                        file_ext = '.' + uploaded_file.name.split('.')[-1].lower() if '.' in uploaded_file.name else ''
-                        allowed_types = field.get_allowed_file_types_list()
-                        
-                        type_allowed = False
-                        for allowed in allowed_types:
-                            if allowed.startswith('.'):  # Es una extensión
-                                if file_ext == allowed.lower():
-                                    type_allowed = True
-                                    break
-                            elif '/' in allowed:  # Es un tipo MIME
-                                if allowed.endswith('/*'):  # Tipo general como image/*
-                                    if file_type.startswith(allowed[:-1]):
-                                        type_allowed = True
-                                        break
-                                elif file_type == allowed:  # Tipo específico
-                                    type_allowed = True
-                                    break
-                        
-                        if not type_allowed:
-                            valid = False
-                            allowed_display = ', '.join(allowed_types)
-                            errors[field_name] = f'Tipo de archivo no permitido. Permitidos: {allowed_display}'
-                        else:
-                            # Calcular costo del archivo
-                            file_cost = field.calculate_file_cost(uploaded_file.size)
-                            total_file_cost += file_cost
-                            
-                            # Almacenar información del archivo para procesamiento posterior
-                            uploaded_files.append({
-                                'field': field,
-                                'file': uploaded_file,
-                                'cost': file_cost,
-                                'file_type': file_type
-                            })
-                            
-                            submission_data[field_name] = f"archivo_{uploaded_file.name}"
-            else:
-                # Manejar otros tipos de campo
-                value = request.POST.get(field_name)
-                
-                if field.is_required and not value:
-                    valid = False
-                    errors[field_name] = 'Este campo es obligatorio'
-                else:
-                    submission_data[field_name] = value
-        
-        # Verificar si el usuario tiene suficientes monedas para los archivos
-        if valid and total_file_cost > 0 and request.user.is_authenticated:
-            if request.user.monedas < total_file_cost:
-                valid = False
-                errors['__all__'] = f'No tienes suficientes monedas para subir los archivos. Necesitas {total_file_cost} monedas, tienes {request.user.monedas}.'
-        
-        if valid:
-            with transaction.atomic():
-                # Guardar envío
-                submission = FormSubmission.objects.create(
-                    form=dynamic_form,
-                    submitted_by=request.user if request.user.is_authenticated else None,
-                    data=submission_data,
-                    ip_address=get_client_ip(request)
-                )
-                
-                # Procesar archivos subidos
-                for file_info in uploaded_files:
-                    from .models import UploadedFile
-                    
-                    uploaded_file_obj = UploadedFile.objects.create(
-                        submission=submission,
-                        field=file_info['field'],
-                        file=file_info['file'],
-                        original_name=file_info['file'].name,
-                        file_size=file_info['file'].size,
-                        mime_type=file_info['file_type'],
-                        cost_charged=file_info['cost'],
-                        uploaded_by=request.user if request.user.is_authenticated else None
-                    )
-                    
-                    # Actualizar referencia en submission_data
-                    field_name = f'field_{file_info["field"].id}'
-                    submission_data[field_name] = uploaded_file_obj.file.url
-                
-                # Actualizar los datos del submission con las URLs de los archivos
-                submission.data = submission_data
-                submission.save()
-                
-                # Cobrar monedas por los archivos
-                if total_file_cost > 0 and request.user.is_authenticated:
-                    request.user.monedas -= total_file_cost
-                    request.user.save()
-                    
-                    # Registrar transacción
-                    from .models import CoinTransaction
-                    CoinTransaction.objects.create(
-                        user=request.user,
-                        organization=organization,
-                        transaction_type='spend',
-                        amount=total_file_cost,
-                        description=f'Subida de archivos en formulario: {dynamic_form.title}',
-                        related_form=dynamic_form
-                    )
-                
-                # Log de actividad
-                if request.user.is_authenticated:
-                    log_activity(
-                        request.user, 'submit_form',
-                        f'Formulario enviado: {dynamic_form.title}' + 
-                        (f' (archivos: {len(uploaded_files)}, costo: {total_file_cost} monedas)' if uploaded_files else ''),
-                        organization=organization, form=dynamic_form, request=request
-                    )
-                
-            messages.success(request, 
-                f'Formulario enviado exitosamente.' + 
-                (f' Archivos subidos: {len(uploaded_files)}. Costo: {total_file_cost} monedas.' if uploaded_files else '')
-            )
-            return redirect('mainapp:form_success')
+        return _handle_form_submission(request, organization, dynamic_form, form_processor)
     
-    context = {
-        'organization': organization,
-        'dynamic_form': dynamic_form,
-        'fields': fields,
-    }
+    # Construir contexto para GET
+    context = form_processor.build_context(request, organization, dynamic_form)
     return render(request, 'mainapp/view_form.html', context)
+
+
+def _handle_form_submission(request, organization, dynamic_form, form_processor):
+    """
+    Maneja el envío del formulario - Single Responsibility
+    """
+    # Procesar envío usando el procesador
+    result = form_processor.process_form_submission(request, organization, dynamic_form)
+    
+    if result['success']:
+        # Éxito: preparar mensaje y redirigir
+        message_parts = ['Formulario enviado exitosamente.']
+        
+        if result.get('uploaded_files'):
+            uploaded_count = len(result['uploaded_files'])
+            file_cost = result.get('file_cost', 0)
+            message_parts.append(f'Archivos subidos: {uploaded_count}. Costo: {file_cost} monedas.')
+        
+        if result.get('business_result', {}).get('processed'):
+            message_parts.append('Lógica de negocio aplicada.')
+        
+        form_processor.send_success_notification(request, ' '.join(message_parts))
+        return redirect('mainapp:form_success')
+    
+    else:
+        # Error: mostrar errores y volver al formulario
+        if 'errors' in result:
+            for field, error in result['errors'].items():
+                form_processor.send_error_notification(request, f'{field}: {error}')
+        elif 'error' in result:
+            form_processor.send_error_notification(request, result['error'])
+        
+        # Volver al formulario con el contexto
+        context = form_processor.build_context(request, organization, dynamic_form)
+        return render(request, 'mainapp/view_form.html', context)
+
 
 def form_success(request):
     """Página de éxito después de enviar un formulario"""
@@ -655,28 +544,6 @@ def form_submissions(request, org_slug, form_id):
     
     submissions = dynamic_form.submissions.all().order_by('-submitted_at')
     fields = dynamic_form.fields.all().order_by('order')
-    
-    # DEBUG: Información de debug
-    print(f"=== DEBUG form_submissions ===")
-    print(f"Formulario ID: {form_id}")
-    print(f"Organización: {organization.name}")
-    print(f"Total submissions: {submissions.count()}")
-    print(f"Campos del formulario:")
-    for field in fields:
-        print(f"  - Campo ID: {field.id}, Label: {field.label}, Order: {field.order}")
-    
-    print(f"Datos de submissions:")
-    for i, submission in enumerate(submissions[:3]):  # Solo primeras 3
-        print(f"  Submission {i+1}:")
-        print(f"    ID: {submission.id}")
-        print(f"    Usuario: {submission.submitted_by}")
-        print(f"    Fecha: {submission.submitted_at}")
-        print(f"    Datos: {submission.data}")
-        print(f"    Tipo de datos: {type(submission.data)}")
-        if isinstance(submission.data, dict):
-            for key, value in submission.data.items():
-                print(f"      {key}: {value}")
-    print(f"=== FIN DEBUG ===")
     
     context = {
         'organization': organization,

@@ -1,5 +1,5 @@
 """
-Mixins para vistas basadas en clases
+Mixins para vistas basadas en clases siguiendo principios SOLID
 """
 
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -11,7 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.core.exceptions import PermissionDenied
 
 from .models import Organization, DynamicForm
-from .services import OrganizationService, CoinService, ServiceError, PermissionError
+from .service_factory import ServiceFactory
 
 
 class OrganizationRequiredMixin(LoginRequiredMixin):
@@ -24,10 +24,18 @@ class OrganizationRequiredMixin(LoginRequiredMixin):
             return redirect('mainapp:select_organization')
         
         try:
-            self.org_service = OrganizationService(request.user, request)
-            self.organization, self.membership = self.org_service.get_user_organization(self.org_slug)
-        except PermissionError as e:
-            messages.error(request, str(e))
+            # Usar servicios SOLID
+            self.permission_service = ServiceFactory.get_permission_service()
+            self.organization = get_object_or_404(Organization, slug=self.org_slug, is_active=True)
+            self.membership = self.permission_service.get_user_membership(request.user, self.organization)
+            
+            if not self.membership:
+                messages.error(request, 'No tienes acceso a esta organización')
+                return redirect('mainapp:select_organization')
+                
+        except Exception as e:
+            messages.error(request, f'Error al acceder a la organización: {str(e)}')
+            return redirect('mainapp:select_organization')
             return redirect('mainapp:select_organization')
         
         return super().dispatch(request, *args, **kwargs)
@@ -94,22 +102,26 @@ class FormOwnerRequiredMixin:
 
 
 class CoinRequiredMixin:
-    """Mixin que verifica si el usuario tiene suficientes monedas"""
+    """Mixin que verifica si el usuario tiene suficientes monedas usando servicios SOLID"""
     required_coins = 0  # Debe ser sobrescrito en la vista
     
     def dispatch(self, request, *args, **kwargs):
-        self.coin_service = CoinService(request.user, request)
+        # Verificar monedas directamente sin servicios legacy
+        if hasattr(request.user, 'monedas'):
+            user_coins = request.user.monedas
+        else:
+            user_coins = 0
         
         if hasattr(self, 'get_required_coins'):
             required = self.get_required_coins()
         else:
             required = self.required_coins
         
-        if not self.coin_service.check_balance(required):
+        if user_coins < required:
             messages.error(
                 request,
                 f'No tienes suficientes monedas. Necesitas {required}, '
-                f'pero solo tienes {request.user.monedas}.'
+                f'pero solo tienes {user_coins}.'
             )
             return self.handle_insufficient_coins(request, *args, **kwargs)
         
@@ -121,7 +133,7 @@ class CoinRequiredMixin:
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs) if hasattr(super(), 'get_context_data') else {}
-        context['coin_service'] = self.coin_service
+        context['user_coins'] = self.request.user.monedas if hasattr(self.request.user, 'monedas') else 0
         return context
 
 
@@ -160,40 +172,48 @@ class AjaxResponseMixin:
 
 
 class ServiceMixin:
-    """Mixin que proporciona servicios comunes"""
+    """Mixin que proporciona servicios SOLID"""
     
-    def get_coin_service(self):
-        if not hasattr(self, '_coin_service'):
-            self._coin_service = CoinService(self.request.user, self.request)
-        return self._coin_service
+    def get_permission_service(self):
+        if not hasattr(self, '_permission_service'):
+            self._permission_service = ServiceFactory.get_permission_service()
+        return self._permission_service
     
-    def get_org_service(self):
-        if not hasattr(self, '_org_service'):
-            self._org_service = OrganizationService(self.request.user, self.request)
-        return self._org_service
+    def get_validation_service(self):
+        if not hasattr(self, '_validation_service'):
+            self._validation_service = ServiceFactory.get_validation_service()
+        return self._validation_service
+    
+    def get_notification_service(self):
+        if not hasattr(self, '_notification_service'):
+            self._notification_service = ServiceFactory.get_notification_service()
+        return self._notification_service
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs) if hasattr(super(), 'get_context_data') else {}
         context.update({
-            'coin_service': self.get_coin_service(),
-            'org_service': self.get_org_service(),
+            'permission_service': self.get_permission_service(),
+            'validation_service': self.get_validation_service(),
+            'user_coins': self.request.user.monedas if hasattr(self.request.user, 'monedas') else 0,
         })
         return context
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class CSRFExemptMixin:
     """Mixin para eximir de CSRF (usar con cuidado)"""
-    pass
+    
+    @method_decorator(csrf_exempt)
+    def dispatch(self, request, *args, **kwargs):
+        return super().dispatch(request, *args, **kwargs)
 
 
 class PermissionRequiredMixin:
-    """Mixin que requiere permisos específicos en la organización"""
+    """Mixin que requiere permisos específicos en la organización usando servicios SOLID"""
     required_permission = None  # Debe ser sobrescrito
     
     def dispatch(self, request, *args, **kwargs):
         # Debe usarse junto con OrganizationRequiredMixin
-        if not hasattr(self, 'org_service'):
+        if not hasattr(self, 'permission_service'):
             raise AttributeError('PermissionRequiredMixin requiere OrganizationRequiredMixin')
         
         permission = self.get_required_permission()
@@ -201,8 +221,21 @@ class PermissionRequiredMixin:
             raise AttributeError('required_permission debe ser definido')
         
         try:
-            self.org_service.check_permission(self.organization, permission)
-        except PermissionError as e:
+            # Usar el servicio de permisos SOLID
+            if permission == 'edit_forms':
+                has_permission = self.membership and (self.membership.is_admin or self.membership.can_edit_forms)
+            elif permission == 'manage_organization':
+                has_permission = self.membership and self.membership.is_admin
+            elif permission == 'manage_users':
+                has_permission = self.membership and self.membership.is_admin
+            else:
+                has_permission = False
+                
+            if not has_permission:
+                messages.error(request, f'No tienes permisos para: {permission}')
+                return redirect('mainapp:dashboard', org_slug=self.org_slug)
+                
+        except Exception as e:
             messages.error(request, str(e))
             return redirect('mainapp:dashboard', org_slug=self.org_slug)
         
