@@ -1,0 +1,311 @@
+{% extends 'mainapp/base.html' %}
+{% load i18n %}
+
+{% block title %}Analíticas - {{ organization.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.analytics-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.analytics-card h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 2.2rem;
+    font-weight: 300;
+}
+
+.analytics-card p {
+    margin: 0;
+    opacity: 0.9;
+}
+
+.chart-container {
+    background: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 1.5rem;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.field-type-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.field-type-bar {
+    height: 20px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    border-radius: 10px;
+    margin-left: 1rem;
+    min-width: 20px;
+}
+
+.trend-point {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #667eea;
+    border-radius: 50%;
+    margin: 0 2px;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.refresh-btn {
+    position: relative;
+}
+
+.refresh-btn.loading .loading-spinner {
+    margin-right: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0">{% trans "Analíticas de Formularios" %}</h1>
+            <p class="text-muted">{{ organization.name }}</p>
+        </div>
+        <button class="btn btn-outline-primary refresh-btn" onclick="refreshAnalytics()">
+            <i class="fas fa-sync-alt"></i> {% trans "Actualizar" %}
+        </button>
+    </div>
+
+    <!-- Métricas principales -->
+    <div class="metric-grid">
+        <div class="analytics-card">
+            <h3>{{ analytics.total_forms }}</h3>
+            <p>{% trans "Formularios Creados" %}</p>
+        </div>
+        <div class="analytics-card">
+            <h3>{{ analytics.total_submissions }}</h3>
+            <p>{% trans "Respuestas Recibidas" %}</p>
+        </div>
+        <div class="analytics-card">
+            <h3>{{ analytics.total_cost_spent|floatformat:0 }}</h3>
+            <p>{% trans "Monedas Gastadas" %}</p>
+        </div>
+        <div class="analytics-card">
+            <h3>{{ analytics.average_cost_per_form|floatformat:1 }}</h3>
+            <p>{% trans "Costo Promedio por Formulario" %}</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Tipos de campo más usados -->
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4 class="mb-3">
+                    <i class="fas fa-chart-bar text-primary"></i>
+                    {% trans "Tipos de Campo Más Utilizados" %}
+                </h4>
+                {% if analytics.most_used_field_types %}
+                    {% for field_type in analytics.most_used_field_types %}
+                        <div class="field-type-item">
+                            <div>
+                                <strong>{{ field_type.field_type__display_name }}</strong>
+                                <small class="text-muted">({{ field_type.count }} veces)</small>
+                            </div>
+                            <div class="field-type-bar" 
+                                 style="width: {{ field_type.count|mul:100|div:analytics.most_used_field_types.0.count }}px;">
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                        <p>{% trans "No hay datos de tipos de campo disponibles" %}</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Tendencias de envíos -->
+        <div class="col-md-6">
+            <div class="chart-container">
+                <h4 class="mb-3">
+                    <i class="fas fa-chart-line text-success"></i>
+                    {% trans "Tendencia de Respuestas (30 días)" %}
+                </h4>
+                {% if analytics.submission_trends %}
+                    <div class="mb-3">
+                        {% for trend in analytics.submission_trends %}
+                            {% for i in trend.count|get_range %}
+                                <span class="trend-point" title="{{ trend.day|date:'d/m/Y' }}: {{ trend.count }} respuestas"></span>
+                            {% endfor %}
+                        {% endfor %}
+                    </div>
+                    <small class="text-muted">
+                        {% trans "Cada punto representa respuestas por día. Pasa el cursor para ver detalles." %}
+                    </small>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-chart-line fa-3x mb-3"></i>
+                        <p>{% trans "No hay datos de tendencias disponibles" %}</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Métricas adicionales -->
+    <div class="row">
+        <div class="col-12">
+            <div class="chart-container">
+                <h4 class="mb-3">
+                    <i class="fas fa-info-circle text-info"></i>
+                    {% trans "Información Detallada" %}
+                </h4>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h5 class="text-primary">{{ user_coins }}</h5>
+                            <p class="text-muted mb-0">{% trans "Monedas Disponibles" %}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h5 class="text-success">{{ membership.role|capfirst }}</h5>
+                            <p class="text-muted mb-0">{% trans "Tu Rol" %}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h5 class="text-warning">{{ organization.members.count }}</h5>
+                            <p class="text-muted mb-0">{% trans "Miembros del Equipo" %}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h5 class="text-info">{{ organization.created_at|date:"M Y" }}</h5>
+                            <p class="text-muted mb-0">{% trans "Organización Creada" %}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Acciones rápidas -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="chart-container">
+                <h4 class="mb-3">
+                    <i class="fas fa-bolt text-warning"></i>
+                    {% trans "Acciones Rápidas" %}
+                </h4>
+                <div class="btn-group" role="group">
+                    <a href="{% url 'mainapp:create_form' org_slug=organization.slug %}" 
+                       class="btn btn-primary">
+                        <i class="fas fa-plus"></i> {% trans "Crear Formulario" %}
+                    </a>
+                    <a href="{% url 'mainapp:form_templates' org_slug=organization.slug %}" 
+                       class="btn btn-outline-primary">
+                        <i class="fas fa-layer-group"></i> {% trans "Ver Plantillas" %}
+                    </a>
+                    <a href="{% url 'mainapp:team_management' org_slug=organization.slug %}" 
+                       class="btn btn-outline-secondary">
+                        <i class="fas fa-users"></i> {% trans "Gestionar Equipo" %}
+                    </a>
+                    <a href="{% url 'mainapp:activity_logs' org_slug=organization.slug %}" 
+                       class="btn btn-outline-info">
+                        <i class="fas fa-history"></i> {% trans "Ver Actividad" %}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function refreshAnalytics() {
+    const btn = document.querySelector('.refresh-btn');
+    const originalContent = btn.innerHTML;
+    
+    // Mostrar loading
+    btn.innerHTML = '<span class="loading-spinner"></span> Actualizando...';
+    btn.disabled = true;
+    btn.classList.add('loading');
+    
+    // Simular actualización (recargar página)
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+}
+
+// Tooltips para los puntos de tendencia
+document.addEventListener('DOMContentLoaded', function() {
+    const trendPoints = document.querySelectorAll('.trend-point');
+    trendPoints.forEach(point => {
+        point.addEventListener('mouseenter', function() {
+            // Aquí podrías agregar tooltips más sofisticados
+            this.style.transform = 'scale(1.5)';
+        });
+        
+        point.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+});
+
+// Animación de contadores
+function animateCounters() {
+    const counters = document.querySelectorAll('.analytics-card h3');
+    
+    counters.forEach(counter => {
+        const target = parseInt(counter.innerText.replace(/,/g, ''));
+        let current = 0;
+        const increment = target / 50;
+        
+        const timer = setInterval(() => {
+            current += increment;
+            if (current >= target) {
+                counter.innerText = target.toLocaleString();
+                clearInterval(timer);
+            } else {
+                counter.innerText = Math.floor(current).toLocaleString();
+            }
+        }, 30);
+    });
+}
+
+// Ejecutar animación al cargar
+document.addEventListener('DOMContentLoaded', animateCounters);
+</script>
+{% endblock %}

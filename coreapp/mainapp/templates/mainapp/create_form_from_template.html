@@ -299,43 +299,75 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'mainapp/js/progress.js' %}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Calcular costo estimado
         calculateEstimatedCost();
         
-        // Validar formulario
+        // Configurar formulario con progreso
         const form = document.getElementById('createFormFromTemplate');
-        const createBtn = document.getElementById('createBtn');
+        const createBtn = WPA.createLoadingButton('#createBtn');
         
-        form.addEventListener('submit', function(e) {
+        form.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            // Deshabilitar botón y mostrar loading
-            createBtn.disabled = true;
-            createBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creando...';
+            // Verificar monedas nuevamente
+            if (!can_afford) {
+                WPA.showToast('No tienes suficientes monedas para crear este formulario', 'danger');
+                return;
+            }
             
-            // Simular delay y enviar
-            setTimeout(() => {
-                form.submit();
-            }, 1000);
+            // Confirmar acción
+            const confirmed = await WPA.confirm(
+                `¿Estás seguro de crear este formulario? Se deducirán ${template_cost} monedas de tu cuenta.`,
+                'Confirmar Creación de Formulario'
+            );
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            // Mostrar loading en botón
+            createBtn.showLoading('Preparando...');
+            
+            // Preparar datos
+            const formData = {
+                org_slug: '{{ organization.slug }}',
+                template_id: {{ template.id }},
+                form_data: {
+                    title: document.getElementById('id_title').value,
+                    description: document.getElementById('id_description').value,
+                    is_public: document.getElementById('id_is_public').checked
+                }
+            };
+            
+            try {
+                // Usar el gestor de progreso para crear el formulario
+                await WPA.formCreation.createFormFromTemplate(formData);
+                createBtn.showSuccess('¡Formulario creado!');
+            } catch (error) {
+                console.error('Error:', error);
+                createBtn.showError('Error al crear');
+                WPA.showToast('Error al crear el formulario. Por favor, intenta nuevamente.', 'danger');
+            }
         });
     });
 
     function calculateEstimatedCost() {
-        // Simular cálculo de costo basado en tipos de campo
-        const fieldTypes = {{ template.template_data.fields|length }};
-        const baseCost = 50; // Costo base por campo
-        const estimatedCost = fieldTypes * baseCost;
+        // Usar el costo real calculado desde el backend
+        const estimatedCost = {{ template_cost }};
         
         document.getElementById('estimated-cost').innerHTML = 
-            '<i class="fas fa-coins me-1"></i>' + estimatedCost;
+            '<i class="fas fa-coins me-1"></i>' + estimatedCost.toLocaleString();
         
         // Verificar si el usuario tiene suficientes monedas
-        const userCoins = {{ user.monedas }};
+        const userCoins = {{ user_coins }};
         const createBtn = document.getElementById('createBtn');
+        window.can_afford = {{ can_afford|yesno:"true,false" }};
+        window.template_cost = estimatedCost;
         
-        if (userCoins < estimatedCost) {
+        if (!window.can_afford) {
             createBtn.disabled = true;
             createBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Monedas Insuficientes';
             createBtn.classList.remove('btn-primary');
@@ -346,7 +378,29 @@
             costCard.insertAdjacentHTML('beforeend', `
                 <div class="alert alert-danger mt-3">
                     <i class="fas fa-exclamation-triangle me-2"></i>
-                    No tienes suficientes monedas. Necesitas ${estimatedCost - userCoins} monedas más.
+                    No tienes suficientes monedas. Necesitas ${(estimatedCost - userCoins).toLocaleString()} monedas más.
+                    <div class="mt-2">
+                        <small>
+                            <strong>Tienes:</strong> ${userCoins.toLocaleString()} monedas<br>
+                            <strong>Necesitas:</strong> ${estimatedCost.toLocaleString()} monedas
+                        </small>
+                    </div>
+                </div>
+            `);
+        } else {
+            // Mostrar información de costo
+            const costCard = createBtn.closest('.card-body');
+            costCard.insertAdjacentHTML('beforeend', `
+                <div class="alert alert-success mt-3">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Tienes suficientes monedas para crear este formulario.
+                    <div class="mt-2">
+                        <small>
+                            <strong>Tienes:</strong> ${userCoins.toLocaleString()} monedas<br>
+                            <strong>Costo:</strong> ${estimatedCost.toLocaleString()} monedas<br>
+                            <strong>Restante:</strong> ${(userCoins - estimatedCost).toLocaleString()} monedas
+                        </small>
+                    </div>
                 </div>
             `);
         }

@@ -1,5 +1,8 @@
 from django.urls import path
 from . import views
+from .class_based_views import (
+    CreateFormFromTemplateView, FormCreationProgressView, FormAnalyticsView
+)
 
 app_name = 'mainapp'
 
@@ -17,7 +20,18 @@ urlpatterns = [
     path('org/<slug:org_slug>/', views.dashboard, name='dashboard'),
     path('org/<slug:org_slug>/edit/', views.edit_organization, name='edit_organization'),
     path('org/<slug:org_slug>/forms/create/', views.create_form, name='create_form'),
-    path('org/<slug:org_slug>/forms/create/from-template/<int:template_id>/', views.create_form_from_template, name='create_form_from_template'),
+    
+    # Nuevas vistas basadas en clases
+    path('org/<slug:org_slug>/forms/create/from-template/<int:template_id>/', 
+         CreateFormFromTemplateView.as_view(), name='create_form_from_template'),
+    path('org/<slug:org_slug>/analytics/', 
+         FormAnalyticsView.as_view(), name='form_analytics'),
+    
+    # API para progreso
+    path('api/form-creation-progress/', 
+         FormCreationProgressView.as_view(), name='form_creation_progress'),
+    
+    # URLs existentes (mantenemos compatibilidad)
     path('org/<slug:org_slug>/forms/templates/', views.form_templates, name='form_templates'),
     path('org/<slug:org_slug>/forms/<int:form_id>/edit/', views.edit_form, name='edit_form'),
     path('org/<slug:org_slug>/forms/<int:form_id>/view/', views.view_form, name='view_form'),

@@ -29,6 +29,9 @@
                             <i class="fas fa-plus"></i> Nuevo Formulario
                         </a></li>
                     {% endif %}
+                    <li><a class="dropdown-item" href="{% url 'mainapp:form_analytics' org_slug=organization.slug %}">
+                        <i class="fas fa-chart-bar"></i> Ver Analíticas
+                    </a></li>
                     {% if membership.can_manage_organization %}
                         <li><a class="dropdown-item" href="{% url 'mainapp:edit_organization' organization.slug %}">
                             <i class="fas fa-edit"></i> Editar Organización
