@@ -1135,10 +1135,26 @@ def create_form_from_template(request, org_slug, template_id):
             messages.success(request, f'¡Formulario "{form.title}" creado exitosamente desde la plantilla!')
             return redirect('mainapp:edit_form', org_slug=org_slug, form_id=form.id)
     
+    # Calcular costo total de la plantilla
+    template_cost = 0
+    for field_data in template.template_data.get('fields', []):
+        try:
+            field_type = FieldType.objects.get(name=field_data['field_type'])
+            template_cost += field_type.cost
+        except FieldType.DoesNotExist:
+            continue
+    
+    # Verificar si el usuario puede costear la plantilla
+    user_coins = request.user.monedas
+    can_afford = user_coins >= template_cost
+    
     context = {
         'organization': organization,
         'membership': membership,
         'template': template,
+        'template_cost': template_cost,
+        'user_coins': user_coins,
+        'can_afford': can_afford,
     }
     return render(request, 'mainapp/create_form_from_template.html', context)
 

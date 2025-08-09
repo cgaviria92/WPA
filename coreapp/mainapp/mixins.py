@@ -36,7 +36,6 @@ class OrganizationRequiredMixin(LoginRequiredMixin):
         except Exception as e:
             messages.error(request, f'Error al acceder a la organización: {str(e)}')
             return redirect('mainapp:select_organization')
-            return redirect('mainapp:select_organization')
         
         return super().dispatch(request, *args, **kwargs)
     
@@ -46,7 +45,6 @@ class OrganizationRequiredMixin(LoginRequiredMixin):
             'organization': self.organization,
             'membership': self.membership,
             'user_coins': self.request.user.monedas,
-            'org_service': self.org_service,
         })
         return context
 
@@ -86,7 +84,7 @@ class FormOwnerRequiredMixin:
             )
             
             # Verificar permisos
-            if not (self.form.created_by == request.user or self.membership.is_admin):
+            if not (self.form.creator == request.user or self.membership.is_admin):
                 messages.error(request, 'No tienes permisos para acceder a este formulario')
                 return redirect('mainapp:dashboard', org_slug=self.org_slug)
                 

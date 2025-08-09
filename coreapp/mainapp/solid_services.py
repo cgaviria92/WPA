@@ -43,7 +43,7 @@ class PermissionService(IPermissionService):
             return False
         
         # El creador o admin puede editar
-        return form.created_by == user or membership.is_admin
+        return form.creator == user or membership.is_admin
     
     def get_user_membership(self, user: User, organization):
         """Obtiene la membresía de un usuario en una organización"""

@@ -21,9 +21,9 @@ urlpatterns = [
     path('org/<slug:org_slug>/edit/', views.edit_organization, name='edit_organization'),
     path('org/<slug:org_slug>/forms/create/', views.create_form, name='create_form'),
     
-    # Nuevas vistas basadas en clases
+    # Usar la función tradicional en lugar de la vista basada en clases
     path('org/<slug:org_slug>/forms/create/from-template/<int:template_id>/', 
-         CreateFormFromTemplateView.as_view(), name='create_form_from_template'),
+         views.create_form_from_template, name='create_form_from_template'),
     path('org/<slug:org_slug>/analytics/', 
          FormAnalyticsView.as_view(), name='form_analytics'),
     

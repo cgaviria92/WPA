@@ -93,7 +93,7 @@ class CreateFormFromTemplateView(BaseOrganizationView, TemplateView):
                     title=title,
                     description=description,
                     organization=self.organization,
-                    created_by=request.user,
+                    creator=request.user,
                     is_public=is_public,
                     total_cost=template_cost
                 )

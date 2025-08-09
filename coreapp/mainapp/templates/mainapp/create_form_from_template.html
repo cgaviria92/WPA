@@ -121,7 +121,7 @@
                                         <td>{{ forloop.counter }}</td>
                                         <td>
                                             <strong>{{ field.label }}</strong>
-                                            {% if field.help_text %}
+                                            {% if field.help_text|default:"" %}
                                             <br><small class="text-muted">{{ field.help_text }}</small>
                                             {% endif %}
                                         </td>
@@ -141,21 +141,21 @@
                                             {% endif %}
                                         </td>
                                         <td>
-                                            {% if field.choices %}
+                                            {% if field.choices|default:"" %}
                                                 <small class="text-muted">
                                                     <i class="fas fa-list me-1"></i>
-                                                    {{ field.choices|length }} opciones
+                                                    Lista de opciones
                                                 </small>
-                                            {% elif field.max_length %}
+                                            {% elif field.max_length|default:"" %}
                                                 <small class="text-muted">
                                                     <i class="fas fa-ruler me-1"></i>
                                                     Máx: {{ field.max_length }}
                                                 </small>
-                                            {% elif field.min_value or field.max_value %}
+                                            {% elif field.min_value|default:"" or field.max_value|default:"" %}
                                                 <small class="text-muted">
                                                     <i class="fas fa-hashtag me-1"></i>
-                                                    {% if field.min_value %}Min: {{ field.min_value }}{% endif %}
-                                                    {% if field.max_value %}Max: {{ field.max_value }}{% endif %}
+                                                    {% if field.min_value|default:"" %}Min: {{ field.min_value }}{% endif %}
+                                                    {% if field.max_value|default:"" %}Max: {{ field.max_value }}{% endif %}
                                                 </small>
                                             {% else %}
                                                 <span class="text-muted">-</span>
@@ -313,14 +313,14 @@
             e.preventDefault();
             
             // Verificar monedas nuevamente
-            if (!can_afford) {
+            if (!window.can_afford) {
                 WPA.showToast('No tienes suficientes monedas para crear este formulario', 'danger');
                 return;
             }
             
             // Confirmar acción
             const confirmed = await WPA.confirm(
-                `¿Estás seguro de crear este formulario? Se deducirán ${template_cost} monedas de tu cuenta.`,
+                `¿Estás seguro de crear este formulario? Se deducirán ${window.template_cost} monedas de tu cuenta.`,
                 'Confirmar Creación de Formulario'
             );
             
@@ -331,21 +331,9 @@
             // Mostrar loading en botón
             createBtn.showLoading('Preparando...');
             
-            // Preparar datos
-            const formData = {
-                org_slug: '{{ organization.slug }}',
-                template_id: {{ template.id }},
-                form_data: {
-                    title: document.getElementById('id_title').value,
-                    description: document.getElementById('id_description').value,
-                    is_public: document.getElementById('id_is_public').checked
-                }
-            };
-            
+            // Enviar formulario directamente
             try {
-                // Usar el gestor de progreso para crear el formulario
-                await WPA.formCreation.createFormFromTemplate(formData);
-                createBtn.showSuccess('¡Formulario creado!');
+                form.submit();
             } catch (error) {
                 console.error('Error:', error);
                 createBtn.showError('Error al crear');
@@ -356,53 +344,37 @@
 
     function calculateEstimatedCost() {
         // Usar el costo real calculado desde el backend
-        const estimatedCost = {{ template_cost }};
+        const estimatedCost = {{ template_cost|default:0 }};
+        const userCoins = {{ user_coins|default:0 }};
+        const canAfford = {{ can_afford|yesno:"true,false" }};
         
-        document.getElementById('estimated-cost').innerHTML = 
-            '<i class="fas fa-coins me-1"></i>' + estimatedCost.toLocaleString();
+        console.log('Template cost:', estimatedCost);
+        console.log('User coins:', userCoins);
+        console.log('Can afford:', canAfford);
         
-        // Verificar si el usuario tiene suficientes monedas
-        const userCoins = {{ user_coins }};
+        // Actualizar display del costo
+        const costElement = document.getElementById('estimated-cost');
+        if (costElement) {
+            costElement.innerHTML = '<i class="fas fa-coins me-1"></i>' + estimatedCost.toLocaleString();
+        }
+        
+        // Configurar botón y verificar monedas
         const createBtn = document.getElementById('createBtn');
-        window.can_afford = {{ can_afford|yesno:"true,false" }};
+        if (!createBtn) return;
+        
+        window.can_afford = canAfford;
         window.template_cost = estimatedCost;
         
-        if (!window.can_afford) {
+        if (!canAfford) {
             createBtn.disabled = true;
             createBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Monedas Insuficientes';
             createBtn.classList.remove('btn-primary');
             createBtn.classList.add('btn-danger');
-            
-            // Mostrar alerta
-            const costCard = createBtn.closest('.card-body');
-            costCard.insertAdjacentHTML('beforeend', `
-                <div class="alert alert-danger mt-3">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    No tienes suficientes monedas. Necesitas ${(estimatedCost - userCoins).toLocaleString()} monedas más.
-                    <div class="mt-2">
-                        <small>
-                            <strong>Tienes:</strong> ${userCoins.toLocaleString()} monedas<br>
-                            <strong>Necesitas:</strong> ${estimatedCost.toLocaleString()} monedas
-                        </small>
-                    </div>
-                </div>
-            `);
         } else {
-            // Mostrar información de costo
-            const costCard = createBtn.closest('.card-body');
-            costCard.insertAdjacentHTML('beforeend', `
-                <div class="alert alert-success mt-3">
-                    <i class="fas fa-check-circle me-2"></i>
-                    Tienes suficientes monedas para crear este formulario.
-                    <div class="mt-2">
-                        <small>
-                            <strong>Tienes:</strong> ${userCoins.toLocaleString()} monedas<br>
-                            <strong>Costo:</strong> ${estimatedCost.toLocaleString()} monedas<br>
-                            <strong>Restante:</strong> ${(userCoins - estimatedCost).toLocaleString()} monedas
-                        </small>
-                    </div>
-                </div>
-            `);
+            createBtn.disabled = false;
+            createBtn.innerHTML = '<i class="fas fa-plus me-2"></i>Crear Formulario';
+            createBtn.classList.remove('btn-danger');
+            createBtn.classList.add('btn-primary');
         }
     }
 </script>
