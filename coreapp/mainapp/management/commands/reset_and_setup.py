@@ -64,10 +64,10 @@ class Command(BaseCommand):
                     User.objects.create_superuser(
                         username='admin',
                         email='admin@example.com',
-                        password='admin123',
+                        password='admin1234',
                         monedas=10000
                     )
-                    self.stdout.write(self.style.SUCCESS('   ✓ Superusuario creado (admin/admin123)'))
+                    self.stdout.write(self.style.SUCCESS('   ✓ Superusuario creado (admin/admin1234)'))
                 else:
                     self.stdout.write(self.style.WARNING('   ⚠️  Superusuario ya existe'))
 
@@ -103,7 +103,7 @@ class Command(BaseCommand):
                     '📊 Resumen de lo configurado:\n'
                     '   • Base de datos SQLite creada\n'
                     '   • Migraciones aplicadas\n'
-                    '   • Superusuario: admin / admin123\n'
+                    '   • Superusuario: admin / admin1234\n'
                     '   • Tipos de campo configurados\n'
                     '   • Organización de ejemplo creada\n'
                     '   • 5 plantillas de formularios\n'
@@ -112,7 +112,7 @@ class Command(BaseCommand):
                     '   python manage.py runserver 0.0.0.0:8000\n\n'
                     '🌐 Accede en: http://localhost:8000\n'
                     '   Usuario: admin\n'
-                    '   Contraseña: admin123\n'
+                    '   Contraseña: admin1234\n'
                 )
             )
 

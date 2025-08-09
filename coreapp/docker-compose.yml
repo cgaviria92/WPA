@@ -1,0 +1,59 @@
+# Docker Compose para WPA - Sistema de Formularios Dinámicos
+version: '3.8'
+
+services:
+  wpa:
+    build: .
+    container_name: wpa-app
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistir la base de datos
+      - wpa_db:/app/db.sqlite3
+      # Persistir archivos media subidos
+      - wpa_media:/app/media
+      # Persistir logs
+      - wpa_logs:/app/logs
+    environment:
+      - DJANGO_SETTINGS_MODULE=coreapp.settings
+      - DEBUG=False
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - wpa-network
+
+  # Opcional: Nginx como proxy reverso (descomenta si lo necesitas)
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: wpa-nginx
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - wpa_static:/app/staticfiles:ro
+  #   depends_on:
+  #     - wpa
+  #   restart: unless-stopped
+  #   networks:
+  #     - wpa-network
+
+volumes:
+  wpa_db:
+    driver: local
+  wpa_media:
+    driver: local
+  wpa_logs:
+    driver: local
+  wpa_static:
+    driver: local
+
+networks:
+  wpa-network:
+    driver: bridge

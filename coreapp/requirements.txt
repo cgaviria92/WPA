@@ -1,0 +1,15 @@
+# Dependencias principales de WPA
+Django>=5.0,<6.0
+Pillow>=10.0.0
+
+# Utilidades de configuración
+python-decouple>=3.8
+
+# Servidor de archivos estáticos
+whitenoise>=6.5.0
+
+# Utilidades adicionales para producción
+gunicorn>=21.2.0
+
+# Desarrollo y debugging (opcional)
+django-debug-toolbar>=4.2.0
