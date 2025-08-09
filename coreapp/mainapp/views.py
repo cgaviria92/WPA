@@ -1148,6 +1148,76 @@ def create_form_from_template(request, org_slug, template_id):
     user_coins = request.user.monedas
     can_afford = user_coins >= template_cost
     
+    # Procesar lógica de negocio para hacerla más amigable
+    business_logic_description = None
+    if template.business_logic:
+        if template.category == 'sales':
+            business_logic_description = {
+                'title': 'Automatización de Ventas',
+                'features': [
+                    'Calcula automáticamente el total de la venta',
+                    'Determina el margen de ganancia por producto',
+                    'Verifica disponibilidad en inventario',
+                    'Actualiza stock automáticamente',
+                    'Genera reportes de rentabilidad'
+                ]
+            }
+        elif template.category == 'inventory':
+            business_logic_description = {
+                'title': 'Gestión de Inventario',
+                'features': [
+                    'Rastrea movimientos de stock en tiempo real',
+                    'Calcula valores de inventario',
+                    'Genera alertas de stock bajo',
+                    'Controla entradas y salidas',
+                    'Mantiene histórico de transacciones'
+                ]
+            }
+        elif template.category == 'hr':
+            business_logic_description = {
+                'title': 'Recursos Humanos',
+                'features': [
+                    'Valida información de empleados',
+                    'Calcula beneficios automáticamente',
+                    'Genera expedientes digitales',
+                    'Controla accesos y permisos',
+                    'Procesa evaluaciones de desempeño'
+                ]
+            }
+        elif template.category == 'customer':
+            business_logic_description = {
+                'title': 'Atención al Cliente',
+                'features': [
+                    'Categoriza tickets automáticamente',
+                    'Asigna prioridades por urgencia',
+                    'Envía notificaciones automáticas',
+                    'Rastrea tiempos de respuesta',
+                    'Genera métricas de satisfacción'
+                ]
+            }
+        elif template.category == 'finance':
+            business_logic_description = {
+                'title': 'Gestión Financiera',
+                'features': [
+                    'Calcula totales y subtotales automáticamente',
+                    'Genera reportes contables',
+                    'Controla presupuestos y gastos',
+                    'Valida transacciones financieras',
+                    'Mantiene histórico de movimientos'
+                ]
+            }
+        else:
+            business_logic_description = {
+                'title': 'Automatización Personalizada',
+                'features': [
+                    'Procesa datos automáticamente',
+                    'Valida información ingresada',
+                    'Genera reportes dinámicos',
+                    'Integra con otros sistemas',
+                    'Mantiene auditoría completa'
+                ]
+            }
+    
     context = {
         'organization': organization,
         'membership': membership,
@@ -1155,6 +1225,7 @@ def create_form_from_template(request, org_slug, template_id):
         'template_cost': template_cost,
         'user_coins': user_coins,
         'can_afford': can_afford,
+        'business_logic_description': business_logic_description,
     }
     return render(request, 'mainapp/create_form_from_template.html', context)
 

@@ -214,17 +214,30 @@
                     <div class="card-header bg-success text-white">
                         <h6 class="mb-0">
                             <i class="fas fa-cogs me-2"></i>
-                            Lógica de Negocio
+                            Lógica de Negocio Automática
                         </h6>
                     </div>
                     <div class="card-body">
-                        <div class="alert alert-info mb-0">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Esta plantilla incluye lógica de negocio automática que se aplicará a los datos enviados.
-                        </div>
-                        <div class="mt-3">
-                            <small class="text-muted">{{ template.business_logic|truncatewords:20 }}</small>
-                        </div>
+                        {% if business_logic_description %}
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="fas fa-magic me-2 text-success"></i>
+                                <strong>{{ business_logic_description.title }}</strong>
+                            </div>
+                            <p class="mb-3 text-muted">Esta plantilla incluye automatización avanzada que procesará los datos automáticamente:</p>
+                            <ul class="mb-0">
+                                {% for feature in business_logic_description.features %}
+                                <li class="mb-1">
+                                    <i class="fas fa-check text-success me-2"></i>
+                                    {{ feature }}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Esta plantilla incluye lógica de negocio automática que se aplicará a los datos enviados.
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
