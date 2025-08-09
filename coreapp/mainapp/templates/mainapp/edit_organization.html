@@ -48,7 +48,7 @@
                             <p><strong>Slug:</strong> {{ organization.slug }}</p>
                             <p><strong>Descripción:</strong> {{ organization.description|default:"Sin descripción" }}</p>
                             <p><strong>Creada:</strong> {{ organization.created_at|date:"d/m/Y H:i" }}</p>
-                            <p><strong>Miembros:</strong> {{ organization.memberships.filter:is_active=True.count }}</p>
+                            <p><strong>Miembros:</strong> {{ active_members_count }}</p>
                         </div>
                     </div>
 
@@ -118,13 +118,9 @@
                     <div class="col-md-6">
                         <h6><i class="fas fa-chart-bar"></i> Estadísticas</h6>
                         <ul class="list-unstyled">
-                            <li><strong>Formularios:</strong> {{ organization.forms.filter:is_active=True.count }}</li>
-                            <li><strong>Respuestas totales:</strong> 
-                                {% with total_submissions=organization.forms.all.submissions.count %}
-                                    {{ total_submissions }}
-                                {% endwith %}
-                            </li>
-                            <li><strong>Miembros activos:</strong> {{ organization.memberships.filter:is_active=True.count }}</li>
+                            <li><strong>Formularios:</strong> {{ active_forms_count }}</li>
+                            <li><strong>Respuestas totales:</strong> {{ total_submissions }}</li>
+                            <li><strong>Miembros activos:</strong> {{ active_members_count }}</li>
                         </ul>
                     </div>
                     <div class="col-md-6">

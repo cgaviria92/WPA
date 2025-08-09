@@ -181,10 +181,18 @@ def edit_organization(request, org_slug):
     else:
         form = OrganizationCreationForm(instance=organization)
     
+    # Estadísticas para mostrar en el template
+    active_members_count = organization.memberships.filter(is_active=True).count()
+    active_forms_count = organization.forms.filter(is_active=True).count()
+    total_submissions = sum(form.submissions.count() for form in organization.forms.all())
+    
     context = {
         'form': form,
         'organization': organization,
         'membership': membership,
+        'active_members_count': active_members_count,
+        'active_forms_count': active_forms_count,
+        'total_submissions': total_submissions,
     }
     return render(request, 'mainapp/edit_organization.html', context)
 
