@@ -19,9 +19,19 @@ from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import JsonResponse
+
+def health(request):
+    """Health check endpoint para Docker y monitoreo"""
+    return JsonResponse({
+        "status": "ok",
+        "service": "WPA",
+        "version": "1.0.0"
+    })
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('health/', health, name='health'),
     path('', include('mainapp.urls', namespace='mainapp')),
     path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
