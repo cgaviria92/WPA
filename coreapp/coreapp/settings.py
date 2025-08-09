@@ -82,10 +82,25 @@ WSGI_APPLICATION = 'coreapp.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+import os
+
+# Configuración de base de datos que funciona tanto local como en Docker
+if os.environ.get('DOCKER_CONTAINER', False):
+    # Configuración para Docker - usando volumen persistente
+    DATABASE_DIR = Path('/app/db_data')
+    DATABASE_DIR.mkdir(exist_ok=True)
+    DATABASE_PATH = DATABASE_DIR / 'db.sqlite3'
+else:
+    # Configuración para desarrollo local
+    DATABASE_PATH = BASE_DIR / 'db.sqlite3'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': DATABASE_PATH,
+        'OPTIONS': {
+            'timeout': 20,
+        }
     }
 }
 
@@ -125,6 +140,13 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # Para Docker y producción
+
+# Solo incluir el directorio si existe
+STATICFILES_DIRS = []
+MAINAPP_STATIC_DIR = BASE_DIR / 'mainapp' / 'static'
+if MAINAPP_STATIC_DIR.exists():
+    STATICFILES_DIRS.append(MAINAPP_STATIC_DIR)
 
 # Media files (uploads)
 MEDIA_URL = '/media/'

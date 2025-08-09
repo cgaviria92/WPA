@@ -34,7 +34,8 @@ RUN apk add --no-cache \
     fribidi-dev \
     libimagequant-dev \
     libxcb-dev \
-    libpng-dev
+    libpng-dev \
+    curl
 
 # Crear usuario no-root para seguridad
 RUN addgroup -g 1000 wpauser && \
@@ -98,10 +99,6 @@ RUN echo '#!/bin/sh' > /app/docker-entrypoint.sh && \
     echo 'echo "📁 Recopilando archivos estáticos..."' >> /app/docker-entrypoint.sh && \
     echo 'python manage.py collectstatic --noinput --clear' >> /app/docker-entrypoint.sh && \
     echo '' >> /app/docker-entrypoint.sh && \
-    echo '# Verificar sistema' >> /app/docker-entrypoint.sh && \
-    echo 'echo "🔍 Verificando sistema..."' >> /app/docker-entrypoint.sh && \
-    echo 'python manage.py check' >> /app/docker-entrypoint.sh && \
-    echo '' >> /app/docker-entrypoint.sh && \
     echo 'echo "🌐 Iniciando servidor en puerto 8000..."' >> /app/docker-entrypoint.sh && \
     echo 'echo "📋 Credenciales: admin / admin1234"' >> /app/docker-entrypoint.sh && \
     echo 'echo "🔗 Acceso: http://localhost:8000"' >> /app/docker-entrypoint.sh && \
@@ -110,9 +107,8 @@ RUN echo '#!/bin/sh' > /app/docker-entrypoint.sh && \
     chmod +x /app/docker-entrypoint.sh
 
 # Comando por defecto
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["python", "manage.py", "reset_and_setup", "--execute", "--initial-data", "--admin-user", "admin", "--admin-password", "admin1234", "--admin-email", "admin@example.com", "--serve"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD python manage.py check || exit 1
+    CMD curl -f http://localhost:8000/ || exit 1

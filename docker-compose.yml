@@ -8,16 +8,17 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Persistir la base de datos
-      - wpa_db:/app/db.sqlite3
+      # Persistir la carpeta completa de la base de datos
+      - wpa_db:/app/db_data
       # Persistir archivos media subidos
       - wpa_media:/app/media
+      # Persistir archivos estáticos
+      - wpa_static:/app/staticfiles
       # Persistir logs
       - wpa_logs:/app/logs
-      # Para desarrollo (opcional): montar código fuente
-      # - ./coreapp:/app
     environment:
       - DJANGO_SETTINGS_MODULE=coreapp.settings
+      - DOCKER_CONTAINER=true
       - DEBUG=False
       - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
     restart: unless-stopped
