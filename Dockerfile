@@ -14,10 +14,11 @@ ENV DJANGO_SETTINGS_MODULE=coreapp.settings
 # Set the working directory
 WORKDIR /app
 
-# Instalar dependencias del sistema necesarias para Django, SQLite y Pillow + curl para healthcheck
+# Instalar dependencias del sistema necesarias para Django, PostgreSQL y Pillow + curl para healthcheck
 RUN apk add --no-cache \
     gcc \
     musl-dev \
+    postgresql-dev \
     sqlite \
     sqlite-dev \
     jpeg-dev \
@@ -44,11 +45,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copiar archivos de proyecto
 COPY coreapp/ /app/
 
-# Configurar permisos y entrypoint
-RUN chmod +x /app/entrypoint.sh
-
 # Crear directorios necesarios
 RUN mkdir -p /app/media /app/staticfiles /app/logs /app/data
+
+# Configurar permisos y entrypoint
+RUN chmod +x /app/entrypoint.sh
 
 # Exponer puerto
 EXPOSE 8000
@@ -57,5 +58,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/ || exit 1
 
-# Usar nuestro entrypoint
+# Usar entrypoint para migraciones automáticas
 ENTRYPOINT ["/app/entrypoint.sh"]
+
+# Comando por defecto
+CMD []

@@ -21,6 +21,9 @@ services:
       - DOCKER_CONTAINER=true
       - DEBUG=False
       - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - DJANGO_SUPERUSER_USERNAME=admin
+      - DJANGO_SUPERUSER_EMAIL=admin@wpa.local
+      - DJANGO_SUPERUSER_PASSWORD=admin1234
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "manage.py", "check"]

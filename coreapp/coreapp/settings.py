@@ -83,26 +83,36 @@ WSGI_APPLICATION = 'coreapp.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 import os
+import dj_database_url
 
-# Configuración de base de datos que funciona tanto local como en Docker
-if os.environ.get('DOCKER_CONTAINER', False):
-    # Configuración para Docker - usando volumen persistente
-    DATABASE_DIR = Path('/app/db_data')
-    DATABASE_DIR.mkdir(exist_ok=True)
-    DATABASE_PATH = DATABASE_DIR / 'db.sqlite3'
+# Configuración de base de datos
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    # Usar PostgreSQL en producción/Docker
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL)
+    }
 else:
-    # Configuración para desarrollo local
-    DATABASE_PATH = BASE_DIR / 'db.sqlite3'
+    # Configuración de SQLite para desarrollo local
+    if os.environ.get('DOCKER_CONTAINER', False):
+        # Configuración para Docker - usando volumen persistente
+        DATABASE_DIR = Path('/app/db_data')
+        DATABASE_DIR.mkdir(exist_ok=True)
+        DATABASE_PATH = DATABASE_DIR / 'db.sqlite3'
+    else:
+        # Configuración para desarrollo local
+        DATABASE_PATH = BASE_DIR / 'db.sqlite3'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': DATABASE_PATH,
-        'OPTIONS': {
-            'timeout': 20,
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': DATABASE_PATH,
+            'OPTIONS': {
+                'timeout': 20,
+            }
         }
     }
-}
 
 
 # Password validation

@@ -76,6 +76,23 @@ fi
 log "📁 Recolectando archivos estáticos..."
 python manage.py collectstatic --noinput --clear
 
+# Crear superusuario si no existe (método alternativo)
+log "👤 Verificando usuario administrador..."
+python manage.py shell << END
+from django.contrib.auth.models import User
+import os
+
+username = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
+email = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@wpa.local')
+password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'admin1234')
+
+if not User.objects.filter(username=username).exists():
+    User.objects.create_superuser(username=username, email=email, password=password)
+    print(f"✅ Superusuario '{username}' creado exitosamente")
+else:
+    print(f"ℹ️  Superusuario '{username}' ya existe")
+END
+
 # Verificar que todo esté funcionando
 log "🔍 Verificando configuración..."
 python manage.py check
