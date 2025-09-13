@@ -116,6 +116,8 @@ class DynamicForm(models.Model):
     total_cost = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Relación con otros formularios
+    related_forms = models.ManyToManyField('self', blank=True, symmetrical=False, related_name='referenced_by')
     
     class Meta:
         ordering = ['-created_at']
