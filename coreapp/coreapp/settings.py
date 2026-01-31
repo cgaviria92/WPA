@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-$+mrcxml3%gzz6$1_(^r-jseaymj5^cuqao9#(c0#85sr4k!5g'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = ['*']  # Permitir acceso desde cualquier IP en desarrollo
 
@@ -85,23 +85,23 @@ WSGI_APPLICATION = 'coreapp.wsgi.application'
 import os
 import dj_database_url
 
-# Configuración de base de datos
+# Configuraciรณn de base de datos
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 if DATABASE_URL:
-    # Usar PostgreSQL en producción/Docker
+    # Usar PostgreSQL en producciรณn/Docker
     DATABASES = {
         'default': dj_database_url.parse(DATABASE_URL)
     }
 else:
-    # Configuración de SQLite para desarrollo local
+    # Configuraciรณn de SQLite para desarrollo local
     if os.environ.get('DOCKER_CONTAINER', False):
-        # Configuración para Docker - usando volumen persistente
+        # Configuraciรณn para Docker - usando volumen persistente
         DATABASE_DIR = Path('/app/db_data')
         DATABASE_DIR.mkdir(exist_ok=True)
         DATABASE_PATH = DATABASE_DIR / 'db.sqlite3'
     else:
-        # Configuración para desarrollo local
+        # Configuraciรณn para desarrollo local
         DATABASE_PATH = BASE_DIR / 'db.sqlite3'
 
     DATABASES = {
@@ -150,7 +150,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'  # Para Docker y producción
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # Para Docker y producciรณn
 
 # Solo incluir el directorio si existe
 STATICFILES_DIRS = []
@@ -171,19 +171,29 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOW_ALL_ORIGINS = True  # Permite conexiones desde cualquier origen
 CORS_ALLOW_CREDENTIALS = True
 
-# Configuración de CSRF para permitir cualquier dominio
+# Configuraciรณn de CSRF para permitir cualquier dominio
+# Obtener dominios de variables de entorno o usar defaults
 CSRF_TRUSTED_ORIGINS = [
-    'http://*',
-    'https://*',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
     'http://0.0.0.0:8000',
 ]
 
-# Para mayor compatibilidad, deshabilitar validación CSRF en desarrollo
-CSRF_COOKIE_SECURE = False
-CSRF_COOKIE_HTTPONLY = False
-CSRF_USE_SESSIONS = False
+# Agregar dominios de Coolify si están definidos en variables de entorno
+SERVICE_URL = os.environ.get('SERVICE_URL_WPA')
+SERVICE_FQDN = os.environ.get('SERVICE_FQDN_WPA')
+
+if SERVICE_URL:
+    CSRF_TRUSTED_ORIGINS.append(SERVICE_URL)
+if SERVICE_FQDN:
+    # Agregar ambas versiones http y https
+    CSRF_TRUSTED_ORIGINS.append(f'http://{SERVICE_FQDN}')
+    CSRF_TRUSTED_ORIGINS.append(f'https://{SERVICE_FQDN}')
+
+# Para mayor compatibilidad, deshabilitar validaciรณn CSRF en desarrollo
+CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'False').lower() in ('true', '1', 't')
+CSRF_COOKIE_HTTPONLY = os.environ.get('CSRF_COOKIE_HTTPONLY', 'False').lower() in ('true', '1', 't')
+CSRF_USE_SESSIONS = os.environ.get('CSRF_USE_SESSIONS', 'False').lower() in ('true', '1', 't')
 
 # Cabeceras permitidas
 CORS_ALLOW_HEADERS = [
@@ -198,7 +208,7 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-# Métodos HTTP permitidos
+# Mรฉtodos HTTP permitidos
 CORS_ALLOW_METHODS = [
     'DELETE',
     'GET',
@@ -208,21 +218,21 @@ CORS_ALLOW_METHODS = [
     'PUT',
 ]
 
-# Configuraciones adicionales para máxima compatibilidad
+# Configuraciones adicionales para mรกxima compatibilidad
 CORS_PREFLIGHT_MAX_AGE = 86400
 CORS_EXPOSE_HEADERS = ['*']
 
-# Configuración de sesiones para acceso remoto
-SESSION_COOKIE_SECURE = False  # Solo para desarrollo
-SESSION_COOKIE_HTTPONLY = False
-SESSION_COOKIE_SAMESITE = None
+# Configuraciรณn de sesiones para acceso remoto
+SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() in ('true', '1', 't')
+SESSION_COOKIE_HTTPONLY = os.environ.get('SESSION_COOKIE_HTTPONLY', 'True').lower() in ('true', '1', 't')
+SESSION_COOKIE_SAMESITE = os.environ.get('SESSION_COOKIE_SAMESITE', 'Lax')
 
-# Configuración adicional de seguridad para desarrollo
-SECURE_BROWSER_XSS_FILTER = False
-SECURE_CONTENT_TYPE_NOSNIFF = False
-X_FRAME_OPTIONS = 'ALLOWALL'
+# Configuraciรณn adicional de seguridad para desarrollo
+SECURE_BROWSER_XSS_FILTER = os.environ.get('SECURE_BROWSER_XSS_FILTER', 'True').lower() in ('true', '1', 't')
+SECURE_CONTENT_TYPE_NOSNIFF = os.environ.get('SECURE_CONTENT_TYPE_NOSNIFF', 'True').lower() in ('true', '1', 't')
+X_FRAME_OPTIONS = os.environ.get('X_FRAME_OPTIONS', 'DENY')
 
-# Configuración de logging simplificada
+# Configuraciรณn de logging simplificada
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
