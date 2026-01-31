@@ -54,9 +54,9 @@ RUN chmod +x /app/entrypoint.sh
 # Exponer puerto
 EXPOSE 8000
 
-# Health check
+# Health check (uses PORT environment variable or defaults to 8000)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
+    CMD sh -c 'curl -f http://localhost:${PORT:-8000}/ || exit 1'
 
 # Usar entrypoint para migraciones automáticas
 ENTRYPOINT ["/app/entrypoint.sh"]
