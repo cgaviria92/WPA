@@ -99,13 +99,16 @@ python manage.py check
 
 log "✅ Inicialización completada exitosamente!"
 log "🌐 Iniciando servidor Django..."
-log "📍 URL: http://localhost:8000"
+
+# Obtener puerto de variable de entorno o usar 8000 por defecto
+PORT=${PORT:-8000}
+log "📍 URL: http://localhost:${PORT}"
 log "👤 Usuario: admin | 🔑 Contraseña: admin1234"
 echo "================================================="
 
 # Ejecutar el comando pasado como argumentos o el servidor por defecto
 if [ $# -eq 0 ]; then
-    exec python manage.py runserver 0.0.0.0:8000
+    exec python manage.py runserver 0.0.0.0:${PORT}
 else
     exec "$@"
 fi

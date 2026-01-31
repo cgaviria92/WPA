@@ -163,14 +163,43 @@ docker-compose up -d
 3. **Seguridad**: El contenedor ejecuta con usuario no-root
 4. **Logs**: Los logs se almacenan tanto en el contenedor como en volúmenes persistentes
 
+## 🚀 Despliegue en Coolify
+
+Para desplegar en Coolify, sigue estos pasos:
+
+### Configuración de Puertos
+Coolify puede tener conflictos de puertos. Si recibes el error "port is already allocated", configura los puertos:
+
+1. **Crea un archivo `.env`** en Coolify con:
+   ```env
+   HOST_PORT=9000      # Puerto en el host (puede ser 8080, 3000, etc.)
+   PORT=8000           # Puerto dentro del contenedor
+   ```
+
+2. **O configura en la interfaz de Coolify** las variables de entorno:
+   - `HOST_PORT`: Puerto en el host (ej: 9000)
+   - `PORT`: Puerto dentro del contenedor (ej: 8000)
+
+### Solución de Problemas Comunes
+
+**Error: "Bind for 0.0.0.0:8000 failed: port is already allocated"**
+- Solución: Cambia `HOST_PORT` a un puerto diferente (ej: 9000, 8080, 3000)
+- Verifica que el puerto no esté en uso por otro servicio en Coolify
+
+**La aplicación no se inicia en Coolify**
+- Verifica los logs en Coolify: `docker-compose logs -f`
+- Asegúrate de que las variables de entorno estén configuradas correctamente
+- Verifica que el Dockerfile y docker-compose.yml estén en el repositorio
+
 ## 🆘 Soporte
 
 Si encuentras problemas:
 
 1. Revisa los logs: `docker-compose logs -f`
 2. Verifica que Docker esté ejecutándose
-3. Asegúrate de que el puerto 8000 esté libre
+3. Asegúrate de que el puerto 8000 esté libre (o configura HOST_PORT)
 4. Intenta reiniciar desde cero con los comandos de solución de problemas
+5. Para Coolify: Verifica las variables de entorno HOST_PORT y PORT
 
 ---
 
