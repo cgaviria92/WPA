@@ -81,7 +81,7 @@ log "🔍 Verificando configuración..."
 python manage.py check
 
 log "✅ Inicialización completada exitosamente!"
-log "🌐 Iniciando servidor Django..."
+log "🌐 Iniciando servidor..."
 
 # Obtener puerto de variable de entorno o usar 8000 por defecto
 PORT=${PORT:-8000}
@@ -89,9 +89,15 @@ log "📍 URL: http://localhost:${PORT}"
 log "👤 Usuario: admin | 🔑 Contraseña: admin1234"
 echo "================================================="
 
-# Ejecutar el comando pasado como argumentos o el servidor por defecto
-if [ $# -eq 0 ]; then
-    exec python manage.py runserver 0.0.0.0:${PORT}
+# Determinar si estamos en modo producción (DEBUG=False)
+# Convertir a minúsculas y comparar
+DEBUG_LOWER=$(echo "$DEBUG" | tr '[:upper:]' '[:lower:]')
+if [ "$DEBUG_LOWER" = "false" ] || [ "$DEBUG_LOWER" = "0" ] || [ -z "$DEBUG_LOWER" ]; then
+    log "🚀 Modo producción: Iniciando Gunicorn..."
+    # Usar Gunicorn para producción
+    exec gunicorn coreapp.wsgi:application --bind 0.0.0.0:${PORT} --workers 3 --access-logfile -
 else
-    exec "$@"
+    log "🔧 Modo desarrollo: Iniciando servidor Django..."
+    # Usar runserver para desarrollo
+    exec python manage.py runserver 0.0.0.0:${PORT}
 fi

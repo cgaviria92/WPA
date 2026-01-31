@@ -151,10 +151,11 @@ docker-compose up -d
 ## 🏗️ Arquitectura del Contenedor
 
 - **Base**: Python 3.12 Alpine (ligero y seguro)
-- **Puerto**: 8000
+- **Puerto**: 8000 (configurable via variable de entorno PORT)
 - **Usuario**: wpauser (no-root para seguridad)
-- **Servicios**: Django + SQLite
+- **Servicios**: Django + SQLite + Gunicorn (producción)
 - **Auto-configuración**: Migraciones y datos iniciales automáticos
+- **Servidor producción**: Gunicorn se usa automáticamente cuando DEBUG=False
 
 ## 📝 Notas Importantes
 
