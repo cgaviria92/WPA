@@ -24,7 +24,7 @@ services:
       - DJANGO_SUPERUSER_USERNAME=admin
       - DJANGO_SUPERUSER_EMAIL=admin@wpa.local
       - DJANGO_SUPERUSER_PASSWORD=admin1234
-      - PORT=${CONTAINER_PORT:-8000}
+      # PORT will be set by entrypoint script based on CONTAINER_PORT or default to 8000
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "manage.py", "check"]

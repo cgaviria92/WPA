@@ -84,7 +84,8 @@ log "✅ Inicialización completada exitosamente!"
 log "🌐 Iniciando servidor..."
 
 # Obtener puerto de variable de entorno o usar 8000 por defecto
-PORT=${PORT:-8000}
+# Usar CONTAINER_PORT si está definido, de lo contrario usar PORT
+PORT=${CONTAINER_PORT:-${PORT:-8000}}
 log "📍 URL: http://localhost:${PORT}"
 log "👤 Usuario: admin | 🔑 Contraseña: admin1234"
 echo "================================================="
